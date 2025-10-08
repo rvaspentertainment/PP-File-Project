@@ -19,6 +19,16 @@ logging.basicConfig(
 )
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 
+async def keep_alive_ping():
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get("https://running-aime-file-get-81528fdc.koyeb.app/") as resp:
+                    print(f"Pinged self: {resp.status}")
+        except Exception as e:
+            print(f"Ping error: {e}")
+        await asyncio.sleep(60)
+
 
 class Bot(Client):
     def __init__(self):
@@ -34,6 +44,7 @@ class Bot(Client):
 
     async def start(self):
         await super().start()
+        asyncio.create_task(keep_alive_ping())
         me = await self.get_me()
         self.mention = me.mention
         self.username = me.username
