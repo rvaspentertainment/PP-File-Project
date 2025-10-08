@@ -1,6 +1,6 @@
 import motor.motor_asyncio
 from config import Config
-import logging  # Added for logging errors and important information
+import logging
 from .utils import send_log
 
 
@@ -8,11 +8,11 @@ class Database:
     def __init__(self, uri, database_name):
         try:
             self._client = motor.motor_asyncio.AsyncIOMotorClient(uri)
-            self._client.server_info()  # This will raise an exception if the connection fails
+            self._client.server_info()
             logging.info("Successfully connected to MongoDB")
         except Exception as e:
             logging.error(f"Failed to connect to MongoDB: {e}")
-            raise e  # Re-raise the exception after logging it
+            raise e
         self.AshutoshGoswami24 = self._client[database_name]
         self.col = self.AshutoshGoswami24.user
 
@@ -24,6 +24,7 @@ class Database:
             metadata=True,
             metadata_code="Telegram : @AshutoshGoswami24",
             format_template=None,
+            upload_channel=None,  # Added for channel upload
         )
 
     async def add_user(self, b, m):
@@ -157,6 +158,31 @@ class Database:
         except Exception as e:
             logging.error(f"Error getting metadata code for user {id}: {e}")
             return None
+
+    # Channel upload methods
+    async def set_upload_channel(self, id, channel_id):
+        try:
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"upload_channel": channel_id}}
+            )
+        except Exception as e:
+            logging.error(f"Error setting upload channel for user {id}: {e}")
+
+    async def get_upload_channel(self, id):
+        try:
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("upload_channel", None) if user else None
+        except Exception as e:
+            logging.error(f"Error getting upload channel for user {id}: {e}")
+            return None
+
+    async def delete_upload_channel(self, id):
+        try:
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"upload_channel": None}}
+            )
+        except Exception as e:
+            logging.error(f"Error deleting upload channel for user {id}: {e}")
 
 
 AshutoshGoswami24 = Database(Config.DB_URL, Config.DB_NAME)
