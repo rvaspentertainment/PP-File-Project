@@ -1,5 +1,4 @@
 import logging
-import logging.config
 import warnings
 from pyrogram import Client, idle
 from pyrogram import Client, __version__
@@ -12,8 +11,12 @@ import asyncio
 from plugins.web_support import web_server
 import pyromod
 
-logging.config.fileConfig("logging.conf")
-logging.getLogger().setLevel(logging.INFO)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 
 
@@ -34,12 +37,15 @@ class Bot(Client):
         me = await self.get_me()
         self.mention = me.mention
         self.username = me.username
+        
+        # Start web server
         app = web.AppRunner(await web_server())
         await app.setup()
         bind_address = "0.0.0.0"
         await web.TCPSite(app, bind_address, Config.PORT).start()
         logging.info(f"{me.first_name} ✅✅ BOT started successfully ✅✅")
 
+        # Notify admins
         for id in Config.ADMIN:
             try:
                 await self.send_message(
@@ -48,6 +54,7 @@ class Bot(Client):
             except:
                 pass
 
+        # Log to channel
         if Config.LOG_CHANNEL:
             try:
                 curr = datetime.now(timezone("Asia/Kolkata"))
@@ -65,7 +72,8 @@ class Bot(Client):
                     f"🤖 Vᴇʀsɪᴏɴ : `v{__version__} (Layer {layer})`\n"
                     f"📊 Upload Status : {session_status}",
                 )
-            except:
+            except Exception as e:
+                logging.error(f"Failed to send log channel message: {e}")
                 print("Pʟᴇᴀꜱᴇ Mᴀᴋᴇ Tʜɪꜱ Iꜱ Aᴅᴍɪɴ Iɴ Yᴏᴜʀ Lᴏɢ Cʜᴀɴɴᴇʟ")
 
     async def stop(self, *args):
@@ -91,21 +99,30 @@ bot_instance = Bot()
 
 def main():
     async def start_services():
-        if Config.STRING_SESSION and app:
-            await asyncio.gather(
-                app.start(),  # Start the Premium User Client
-                bot_instance.start(),  # Start the bot instance
-            )
-            logging.info("Bot and Premium User Client Started Successfully! 🚀")
-        else:
-            await bot_instance.start()
-            logging.info("Bot Started (Without Premium Session - 2GB Upload Limit) ⚠️")
-        
-        # Keep running
-        await idle()
+        try:
+            if Config.STRING_SESSION and app:
+                await asyncio.gather(
+                    app.start(),  # Start the Premium User Client
+                    bot_instance.start(),  # Start the bot instance
+                )
+                logging.info("Bot and Premium User Client Started Successfully! 🚀")
+            else:
+                await bot_instance.start()
+                logging.info("Bot Started (Without Premium Session - 2GB Upload Limit) ⚠️")
+            
+            # Keep running
+            await idle()
+        except Exception as e:
+            logging.error(f"Error starting services: {e}")
+            raise
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_services())
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(start_services())
+    except KeyboardInterrupt:
+        logging.info("Bot stopped by user")
+    except Exception as e:
+        logging.error(f"Fatal error: {e}")
 
 
 if __name__ == "__main__":
