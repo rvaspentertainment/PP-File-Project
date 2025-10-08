@@ -13,6 +13,7 @@ import time
 import re
 import subprocess
 import asyncio
+from bot import app  # Import premium user client
 
 renaming_operations = {}
 
@@ -48,9 +49,7 @@ def extract_quality(filename):
     match5 = re.search(pattern5, filename)
     if match5:
         print("Matched Pattern 5")
-        quality5 = match5.group(1) or match5.group(
-            2
-        )  # Extracted quality from both patterns
+        quality5 = match5.group(1) or match5.group(2)
         print(f"Quality: {quality5}")
         return quality5
 
@@ -100,46 +99,39 @@ def extract_episode_number(filename):
     match = re.search(pattern1, filename)
     if match:
         print("Matched Pattern 1")
-        return match.group(2)  # Extracted episode number
+        return match.group(2)
 
     # Try Pattern 2
     match = re.search(pattern2, filename)
     if match:
         print("Matched Pattern 2")
-        return match.group(2)  # Extracted episode number
+        return match.group(2)
 
     # Try Pattern 3
     match = re.search(pattern3, filename)
     if match:
         print("Matched Pattern 3")
-        return match.group(1)  # Extracted episode number
+        return match.group(1)
 
     # Try Pattern 3_2
     match = re.search(pattern3_2, filename)
     if match:
         print("Matched Pattern 3_2")
-        return match.group(1)  # Extracted episode number
+        return match.group(1)
 
     # Try Pattern 4
     match = re.search(pattern4, filename)
     if match:
         print("Matched Pattern 4")
-        return match.group(2)  # Extracted episode number
+        return match.group(2)
 
     # Try Pattern X
     match = re.search(patternX, filename)
     if match:
         print("Matched Pattern X")
-        return match.group(1)  # Extracted episode number
+        return match.group(1)
 
-    # Return None if no pattern matches
     return None
-
-
-# Example Usage:
-filename = "Naruto Shippuden S01[episode] [quality][Dual Audio] @AshutoshGoswami24.mkv"
-episode_number = extract_episode_number(filename)
-print(f"Extracted Episode Number: {episode_number}")
 
 
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
@@ -147,26 +139,41 @@ async def auto_rename_files(client, message):
     user_id = message.from_user.id
     format_template = await AshutoshGoswami24.get_format_template(user_id)
     media_preference = await AshutoshGoswami24.get_media_preference(user_id)
+    upload_channel = await AshutoshGoswami24.get_upload_channel(user_id)
 
     if not format_template:
         return await message.reply_text(
             "Please Set An Auto Rename Format First Using /autorename"
         )
 
+    # Get file info
     if message.document:
         file_id = message.document.file_id
         file_name = message.document.file_name
+        file_size = message.document.file_size
         media_type = media_preference or "document"
     elif message.video:
         file_id = message.video.file_id
-        file_name = f"{message.video.file_name}.mp4"
+        file_name = message.video.file_name or "video.mp4"
+        file_size = message.video.file_size
         media_type = media_preference or "video"
     elif message.audio:
         file_id = message.audio.file_id
-        file_name = f"{message.audio.file_name}.mp3"
+        file_name = message.audio.file_name or "audio.mp3"
+        file_size = message.audio.file_size
         media_type = media_preference or "audio"
     else:
         return await message.reply_text("Unsupported File Type")
+
+    # Check file size (4GB limit)
+    if file_size > Config.MAX_FILE_SIZE:
+        size_in_gb = file_size / (1024 * 1024 * 1024)
+        return await message.reply_text(
+            f"**File Too Large!**\n\n"
+            f"File Size: {size_in_gb:.2f} GB\n"
+            f"Maximum Size: 4 GB\n\n"
+            f"Please send a file smaller than 4GB."
+        )
 
     if file_id in renaming_operations:
         elapsed_time = (datetime.now() - renaming_operations[file_id]).seconds
@@ -191,7 +198,7 @@ async def auto_rename_files(client, message):
     os.makedirs(os.path.dirname(renamed_file_path), exist_ok=True)
     os.makedirs(os.path.dirname(metadata_file_path), exist_ok=True)
 
-    download_msg = await message.reply_text("Downloading the file...")
+    download_msg = await message.reply_text("📥 Downloading the file...")
 
     try:
         path = await client.download_media(
@@ -204,7 +211,7 @@ async def auto_rename_files(client, message):
         del renaming_operations[file_id]
         return await download_msg.edit(f"**Download Error:** {e}")
 
-    await download_msg.edit("Renaming and Adding Metadata...")
+    await download_msg.edit("🔄 Renaming and Adding Metadata...")
 
     try:
         # Rename the file first
@@ -217,7 +224,7 @@ async def auto_rename_files(client, message):
         if _bool_metadata:
             metadata = await AshutoshGoswami24.get_metadata_code(user_id)
             if metadata:
-                cmd = f'ffmpeg -i "{renamed_file_path}"  -map 0 -c:s copy -c:a copy -c:v copy -metadata title="{metadata}" -metadata author="{metadata}" -metadata:s:s title="{metadata}" -metadata:s:a title="{metadata}" -metadata:s:v title="{metadata}"  "{metadata_file_path}"'
+                cmd = f'ffmpeg -i "{renamed_file_path}" -map 0 -c:s copy -c:a copy -c:v copy -metadata title="{metadata}" -metadata author="{metadata}" -metadata:s:s title="{metadata}" -metadata:s:a title="{metadata}" -metadata:s:v title="{metadata}" "{metadata_file_path}"'
                 try:
                     process = await asyncio.create_subprocess_shell(
                         cmd,
@@ -241,14 +248,13 @@ async def auto_rename_files(client, message):
             metadata_added = True
 
         if not metadata_added:
-            # Metadata addition failed; upload the renamed file only
             await download_msg.edit(
                 "Metadata addition failed. Uploading the renamed file only."
             )
             path = renamed_file_path
 
         # Upload the file
-        upload_msg = await download_msg.edit("Uploading the file...")
+        upload_msg = await download_msg.edit("📤 Uploading the file...")
 
         ph_path = None
         c_caption = await AshutoshGoswami24.get_caption(message.chat.id)
@@ -257,7 +263,7 @@ async def auto_rename_files(client, message):
         caption = (
             c_caption.format(
                 filename=renamed_file_name,
-                filesize=humanbytes(message.document.file_size),
+                filesize=humanbytes(file_size),
                 duration=convert(0),
             )
             if c_caption
@@ -266,7 +272,7 @@ async def auto_rename_files(client, message):
 
         if c_thumb:
             ph_path = await client.download_media(c_thumb)
-        elif media_type == "video" and message.video.thumbs:
+        elif media_type == "video" and message.video and message.video.thumbs:
             ph_path = await client.download_media(message.video.thumbs[0].file_id)
 
         if ph_path:
@@ -274,10 +280,16 @@ async def auto_rename_files(client, message):
             img = img.resize((320, 320))
             img.save(ph_path, "JPEG")
 
+        # Determine upload destination
+        upload_to = upload_channel if upload_channel else message.chat.id
+        
+        # Use premium user client for uploads if available (supports 4GB)
+        upload_client = app if app and Config.STRING_SESSION else client
+        
         try:
             if media_type == "document":
-                await client.send_document(
-                    message.chat.id,
+                sent_message = await upload_client.send_document(
+                    upload_to,
                     document=path,
                     thumb=ph_path,
                     caption=caption,
@@ -285,8 +297,8 @@ async def auto_rename_files(client, message):
                     progress_args=("Upload Started...", upload_msg, time.time()),
                 )
             elif media_type == "video":
-                await client.send_video(
-                    message.chat.id,
+                sent_message = await upload_client.send_video(
+                    upload_to,
                     video=path,
                     caption=caption,
                     thumb=ph_path,
@@ -295,8 +307,8 @@ async def auto_rename_files(client, message):
                     progress_args=("Upload Started...", upload_msg, time.time()),
                 )
             elif media_type == "audio":
-                await client.send_audio(
-                    message.chat.id,
+                sent_message = await upload_client.send_audio(
+                    upload_to,
                     audio=path,
                     caption=caption,
                     thumb=ph_path,
@@ -304,13 +316,28 @@ async def auto_rename_files(client, message):
                     progress=progress_for_pyrogram,
                     progress_args=("Upload Started...", upload_msg, time.time()),
                 )
+            
+            # If uploaded to channel, send confirmation to user
+            if upload_channel:
+                try:
+                    channel_info = await client.get_chat(upload_channel)
+                    await upload_msg.edit(
+                        f"**✅ Upload Complete!**\n\n"
+                        f"**Uploaded to:** {channel_info.title}\n"
+                        f"**File:** {renamed_file_name}\n"
+                        f"**Size:** {humanbytes(file_size)}"
+                    )
+                except:
+                    await upload_msg.edit("**✅ Upload Complete!**")
+            else:
+                await upload_msg.delete()
+                
         except Exception as e:
-            os.remove(path)
-            if ph_path:
+            if os.path.exists(path):
+                os.remove(path)
+            if ph_path and os.path.exists(ph_path):
                 os.remove(ph_path)
             return await upload_msg.edit(f"**Upload Error:** {e}")
-
-        # await upload_msg.edit("Upload Complete ✅")
 
     except Exception as e:
         await download_msg.edit(f"**Error:** {e}")
