@@ -7,6 +7,9 @@ class Config(object):
     API_HASH  = os.environ.get("API_HASH", "")
     BOT_TOKEN = os.environ.get("BOT_TOKEN", "") 
 
+    # Premium user session for 4GB upload
+    STRING_SESSION = os.environ.get("STRING_SESSION", "")
+
     # database config
     DB_NAME = os.environ.get("DB_NAME","AshutoshGoswami24")     
     DB_URL  = os.environ.get("DB_URL","")
@@ -15,10 +18,12 @@ class Config(object):
     BOT_UPTIME  = time.time()
     START_PIC   = os.environ.get("START_PIC", "")
     ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '').split()]
-    # -- FORCE_SUB_CHANNELS = ["BotzPW","AshuSupport","AshutoshGoswami24"] -- # 
     FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', 'AshutoshGoswami24,BotzPW').split(',')
     LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", ""))
     PORT = int(os.environ.get("PORT", ""))
+    
+    # 4GB upload support (requires premium account session)
+    MAX_FILE_SIZE = 4 * 1024 * 1024 * 1024  # 4GB in bytes
     
     # wes response configuration     
     WEBHOOK = bool(os.environ.get("WEBHOOK", "True"))
@@ -34,6 +39,8 @@ class Txt(object):
 ➻ Using This Bot You Can Auto Rename Of Your Files.
     
 ➻ This Bot Also Supports Custom Thumbnail And Custom Caption.
+
+➻ **4GB Upload Support Available!** (Requires Premium Session)
     
 ➻ Use /tutorial Command To Know How To Use Me.
 
@@ -69,11 +76,21 @@ Use These Keywords To Setup Custom File Name
 ⦿ /viewthumb - Use This Command To See Your Thumbnail
 ⦿ /delthumb - Use This Command To Delete Your Thumbnail"""
 
-    CAPTION_TXT = """<b><u>📝  HOW TO SET CAPTION</u></b>
+    CAPTION_TXT = """<b><u>📝  HOW TO SET CAPTION</u></b>
     
-⦿ /set_caption - Use This Command To Set Your Caption
+⦿ /set_caption - Use This Command To Set Your Caption
 ⦿ /see_caption - Use This Command To See Your Caption
 ⦿ /del_caption - Use This Command To Delete Your Caption"""
+
+    CHANNEL_TXT = """<b><u>📢 CHANNEL UPLOAD SETUP</u></b>
+    
+⦿ /setchannel - Set your channel for auto upload
+⦿ /viewchannel - View current channel settings
+⦿ /delchannel - Remove channel upload feature
+
+<b>Example:</b> <code>/setchannel -100123456789</code>
+
+<b>Note:</b> Make sure bot is admin in your channel!"""
 
     PROGRESS_BAR = """<b>\n
 ╭━━━━❰ᴘʀᴏɢʀᴇss ʙᴀʀ❱━➣
@@ -94,8 +111,3 @@ If You Like My Bots & Projects, You Can 🎁 Donate Me Any Amount From 10 Rs Upt
     HELP_TXT = """<b>Hey</b> {}
     
 Joine @AshutoshGoswami24 To Help """
-
-
-
-
-
