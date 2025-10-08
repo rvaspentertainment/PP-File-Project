@@ -106,8 +106,11 @@ async def cb_handler(client, query: CallbackQuery):
                         InlineKeyboardButton("✏️ Caption", callback_data="caption"),
                     ],
                     [
-                        InlineKeyboardButton("🏠 Home", callback_data="home"),
+                        InlineKeyboardButton("📢 Channel Upload", callback_data="channel"),
                         InlineKeyboardButton("💰 Donate", callback_data="donate"),
+                    ],
+                    [
+                        InlineKeyboardButton("🏠 Home", callback_data="home"),
                     ],
                 ]
             ),
@@ -144,6 +147,23 @@ async def cb_handler(client, query: CallbackQuery):
     elif data == "thumbnail":
         await query.message.edit_caption(
             caption=Txt.THUMBNAIL_TXT,
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("✖️ Close", callback_data="close"),
+                        InlineKeyboardButton("🔙 Back", callback_data="help"),
+                    ]
+                ]
+            ),
+        )
+
+    elif data == "channel":
+        channel_id = await AshutoshGoswami24.get_upload_channel(user_id)
+        channel_status = "✅ Enabled" if channel_id else "❌ Not Set"
+        
+        await query.message.edit_text(
+            text=Txt.CHANNEL_TXT + f"\n\n**Status:** {channel_status}",
+            disable_web_page_preview=True,
             reply_markup=InlineKeyboardMarkup(
                 [
                     [
