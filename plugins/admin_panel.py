@@ -64,7 +64,7 @@ async def ping(_, message):
     return time_taken_s
 
 
-@Client.on_message(filters.command(["stats", "status"]) & filters.user(Config.ADMIN))
+@Client.on_message(filters.command(["stats"]) & filters.user(Config.ADMIN))
 async def get_stats(bot, message):
     total_users = await AshutoshGoswami24.total_users_count()
     # uptime = time.strftime("%Hh%Mm%Ss", time.gmtime(time.time() - bot.uptime))
@@ -128,3 +128,4 @@ async def send_msg(user_id, message):
     except Exception as e:
         logger.error(f"{user_id} : {e}")
         return 500
+
