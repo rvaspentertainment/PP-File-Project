@@ -53,9 +53,17 @@ class Bot(Client):
                 curr = datetime.now(timezone("Asia/Kolkata"))
                 date = curr.strftime("%d %B, %Y")
                 time = curr.strftime("%I:%M:%S %p")
+                
+                session_status = "✅ Premium Session Active" if Config.STRING_SESSION else "⚠️ No Premium Session (2GB Limit)"
+                
                 await self.send_message(
                     Config.LOG_CHANNEL,
-                    f"**__{me.mention} Iꜱ Rᴇsᴛᴀʀᴛᴇᴅ !!**\n\n📅 Dᴀᴛᴇ : `{date}`\n⏰ Tɪᴍᴇ : `{time}`\n🌐 Tɪᴍᴇᴢᴏɴᴇ : `Asia/Kolkata`\n\🤖 Vᴇʀsɪᴏɴ : `v{__version__} (Layer {layer})`</b>",
+                    f"**__{me.mention} Iꜱ Rᴇsᴛᴀʀᴛᴇᴅ !!**\n\n"
+                    f"📅 Dᴀᴛᴇ : `{date}`\n"
+                    f"⏰ Tɪᴍᴇ : `{time}`\n"
+                    f"🌐 Tɪᴍᴇᴢᴏɴᴇ : `Asia/Kolkata`\n"
+                    f"🤖 Vᴇʀsɪᴏɴ : `v{__version__} (Layer {layer})`\n"
+                    f"📊 Upload Status : {session_status}",
                 )
             except:
                 print("Pʟᴇᴀꜱᴇ Mᴀᴋᴇ Tʜɪꜱ Iꜱ Aᴅᴍɪɴ Iɴ Yᴏᴜʀ Lᴏɢ Cʜᴀɴɴᴇʟ")
@@ -65,22 +73,39 @@ class Bot(Client):
         logging.info("Bot Stopped 🙄")
 
 
+# Initialize premium user client if session exists
+app = None
+if Config.STRING_SESSION:
+    app = Client(
+        name="PremiumUser",
+        api_id=Config.API_ID,
+        api_hash=Config.API_HASH,
+        session_string=Config.STRING_SESSION,
+        workers=200,
+        sleep_threshold=15,
+    )
+    logging.info("Premium User Client Initialized ✅")
+
 bot_instance = Bot()
 
 
 def main():
     async def start_services():
-        if Config.STRING_SESSION:
+        if Config.STRING_SESSION and app:
             await asyncio.gather(
-                app.start(),  # Start the Pyrogram Client
+                app.start(),  # Start the Premium User Client
                 bot_instance.start(),  # Start the bot instance
             )
+            logging.info("Bot and Premium User Client Started Successfully! 🚀")
         else:
-            await asyncio.gather(bot_instance.start())
+            await bot_instance.start()
+            logging.info("Bot Started (Without Premium Session - 2GB Upload Limit) ⚠️")
+        
+        # Keep running
+        await idle()
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_services())
-    loop.run_forever()
 
 
 if __name__ == "__main__":
