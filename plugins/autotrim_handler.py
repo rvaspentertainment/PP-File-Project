@@ -152,7 +152,7 @@ def calculate_trim_segments(appearances, duration):
     return segments
 
 
-def trim_and_merge_video(video_path, segments, output_path, progress_callback=None):
+async def trim_and_merge_video(video_path, segments, output_path, progress_callback=None):
     """Trim video into segments and merge them"""
     try:
         segment_files = []
