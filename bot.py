@@ -10,7 +10,7 @@ from datetime import datetime
 import asyncio
 from plugins.web_support import web_server
 import pyromod
-
+import aiohttp
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
