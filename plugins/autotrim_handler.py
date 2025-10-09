@@ -15,7 +15,7 @@ import numpy as np
 from bot import app
 
 # Configuration - Add your intro title video URL here
-INTRO_TITLE_VIDEO_URL = os.environ.get("INTRO_TITLE_VIDEO", "https://envs.sh/your_intro_video.mp4")
+INTRO_TITLE_VIDEO_URL = os.environ.get("INTRO_TITLE_VIDEO", "https://envs.sh/3G7.mp4")
 JAI_BAJARANGABALI_CHANNEL = -1002987317144
 JAI_BAJARANGABALI_THUMB_BASE = "https://envs.sh/zcf.jpg"
 
