@@ -442,32 +442,3 @@ async def merge_command(client, message):
         logging.error(f"Extract audio error: {e}")
 
 
-@Client.on_callback_query(filters.regex("^extract_subs_"))
-async def extract_subs_callback(client, query: CallbackQuery):
-    """Extract subtitles from video"""
-    file_id = query.data.split("_")[-1]
-    user_id = query.from_user.id
-    
-    await query.message.edit_text("**📝 Extracting subtitles...**")
-    
-    try:
-        file_msg = query.message.reply_to_message
-        
-        if file_msg.video:
-            file = file_msg.video
-            filename = file.file_name or "video.mp4"
-        elif file_msg.document:
-            file = file_msg.document
-            filename = file.file_name
-        else:
-            return await query.message.edit_text("**❌ Invalid file type!**")
-        
-        downloads_dir = "downloads"
-        os.makedirs(downloads_dir, exist_ok=True)
-        
-        video_path = os.path.join(downloads_dir, filename)
-        subs_path = os.path.join(downloads_dir, f"{os.path.splitext(filename)[0]}.srt")
-        
-        await query.message.edit_text("**📥 Downloading video...**")
-        
-        upload_client = app if (app and Config.STRING_SESSION) else client
