@@ -310,3 +310,4 @@ class Database:
 
 
 pp_bots = Database(Config.DB_URL, Config.DB_NAME)
+AshutoshGoswami24 = Database(Config.DB_URL, Config.DB_NAME)
