@@ -1,8 +1,10 @@
-import math, time
+import math, time, os, re, shutil
 from datetime import datetime
 from pytz import timezone
 from config import Config, Txt 
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+import requests
+import logging
 
 
 async def progress_for_pyrogram(current, total, ud_type, message, start):
@@ -32,10 +34,11 @@ async def progress_for_pyrogram(current, total, ud_type, message, start):
         try:
             await message.edit(
                 text=f"{ud_type}\n\n{tmp}",               
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✖️ 𝙲𝙰𝙽𝙲𝙴𝙻 ✖️", callback_data="close")]])                                               
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✖️ CANCEL ✖️", callback_data="close")]])                                               
             )
         except:
             pass
+
 
 def humanbytes(size):    
     if not size:
@@ -46,7 +49,7 @@ def humanbytes(size):
     while size > power:
         size /= power
         n += 1
-    return str(round(size, 2)) + " " + Dic_powerN[n] + 'ʙ'
+    return str(round(size, 2)) + " " + Dic_powerN[n] + 'B'
 
 
 def TimeFormatter(milliseconds: int) -> str:
@@ -54,12 +57,13 @@ def TimeFormatter(milliseconds: int) -> str:
     minutes, seconds = divmod(seconds, 60)
     hours, minutes = divmod(minutes, 60)
     days, hours = divmod(hours, 24)
-    tmp = ((str(days) + "ᴅ, ") if days else "") + \
-        ((str(hours) + "ʜ, ") if hours else "") + \
-        ((str(minutes) + "ᴍ, ") if minutes else "") + \
-        ((str(seconds) + "ꜱ, ") if seconds else "") + \
-        ((str(milliseconds) + "ᴍꜱ, ") if milliseconds else "")
+    tmp = ((str(days) + "d, ") if days else "") + \
+        ((str(hours) + "h, ") if hours else "") + \
+        ((str(minutes) + "m, ") if minutes else "") + \
+        ((str(seconds) + "s, ") if seconds else "") + \
+        ((str(milliseconds) + "ms, ") if milliseconds else "")
     return tmp[:-2] 
+
 
 def convert(seconds):
     seconds = seconds % (24 * 3600)
@@ -69,16 +73,214 @@ def convert(seconds):
     seconds %= 60      
     return "%d:%02d:%02d" % (hour, minutes, seconds)
 
+
 async def send_log(b, u):
-    if Config.LOG_CHANNEL is not None:
-        curr = datetime.now(timezone("Asia/Kolkata"))
-        date = curr.strftime('%d %B, %Y')
-        time = curr.strftime('%I:%M:%S %p')
-        await b.send_message(
-            Config.LOG_CHANNEL,
-            f"**--Nᴇᴡ Uꜱᴇʀ Sᴛᴀʀᴛᴇᴅ Tʜᴇ Bᴏᴛ--**\n\nUꜱᴇʀ: {u.mention}\nIᴅ: `{u.id}`\nUɴ: @{u.username}\n\nDᴀᴛᴇ: {date}\nTɪᴍᴇ: {time}\n\nBy: {b.mention}"
-        )
+    if Config.LOG_CHANNEL:
+        try:
+            curr = datetime.now(timezone("Asia/Kolkata"))
+            date = curr.strftime('%d %B, %Y')
+            time = curr.strftime('%I:%M:%S %p')
+            await b.send_message(
+                Config.LOG_CHANNEL,
+                f"**--New User Started The Bot--**\n\n"
+                f"User: {u.mention}\n"
+                f"ID: `{u.id}`\n"
+                f"Username: @{u.username}\n\n"
+                f"Date: {date}\n"
+                f"Time: {time}\n\n"
+                f"By: {b.mention}"
+            )
+        except Exception as e:
+            logging.error(f"Error sending log: {e}")
+
+
+def sanitize_filename(filename):
+    """Remove invalid characters from filename"""
+    # Remove invalid characters
+    filename = re.sub(r'[<>:"/\\|?*]', '', filename)
+    # Replace multiple spaces with single space
+    filename = re.sub(r'\s+', ' ', filename)
+    # Remove leading/trailing spaces and dots
+    filename = filename.strip('. ')
+    return filename
+
+
+def beautify_filename(filename):
+    """Make filename more readable"""
+    # Remove extra dots
+    filename = re.sub(r'\.+', '.', filename)
+    # Remove extra spaces
+    filename = re.sub(r'\s+', ' ', filename)
+    # Capitalize words
+    return filename.strip()
+
+
+def get_disk_space():
+    """Get available disk space in bytes"""
+    try:
+        import psutil
+        disk = psutil.disk_usage('/')
+        return disk.free
+    except:
+        return 0
+
+
+def download_thumbnail(url, save_path):
+    """Download thumbnail from URL"""
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            with open(save_path, 'wb') as f:
+                f.write(response.content)
+            return True
+        return False
+    except Exception as e:
+        logging.error(f"Thumbnail download error: {e}")
+        return False
+
+
+def clean_file(file_path):
+    """Safely remove file if exists"""
+    try:
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+            return True
+    except Exception as e:
+        logging.error(f"Error removing file {file_path}: {e}")
+    return False
+
+
+def clean_directory(directory):
+    """Clean all files in directory"""
+    try:
+        if os.path.exists(directory):
+            for filename in os.listdir(directory):
+                file_path = os.path.join(directory, filename)
+                try:
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                except Exception as e:
+                    logging.error(f"Error removing {file_path}: {e}")
+    except Exception as e:
+        logging.error(f"Error cleaning directory {directory}: {e}")
+
+
+def apply_word_removal(text, remove_words):
+    """Remove specified words from text"""
+    if not remove_words:
+        return text
+    
+    for word in remove_words:
+        # Remove word (case insensitive)
+        text = re.sub(re.escape(word), '', text, flags=re.IGNORECASE)
+    
+    # Clean up extra spaces
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+def apply_word_replacement(text, replace_dict):
+    """Replace words in text based on dictionary"""
+    if not replace_dict:
+        return text
+    
+    for old, new in replace_dict.items():
+        # Replace word (case insensitive)
+        text = re.sub(re.escape(old), new, text, flags=re.IGNORECASE)
+    
+    return text
+
+
+def get_file_extension(filename):
+    """Get file extension"""
+    _, ext = os.path.splitext(filename)
+    return ext.lower()
+
+
+def is_video_file(filename):
+    """Check if file is video"""
+    video_extensions = ['.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.webm', '.m4v']
+    return get_file_extension(filename) in video_extensions
+
+
+def is_audio_file(filename):
+    """Check if file is audio"""
+    audio_extensions = ['.mp3', '.m4a', '.aac', '.opus', '.flac', '.wav', '.ogg']
+    return get_file_extension(filename) in audio_extensions
+
+
+def is_subtitle_file(filename):
+    """Check if file is subtitle"""
+    subtitle_extensions = ['.srt', '.ass', '.vtt', '.sub']
+    return get_file_extension(filename) in subtitle_extensions
+
+
+def parse_time(time_str):
+    """Parse time string to seconds (HH:MM:SS or MM:SS or SS)"""
+    try:
+        parts = time_str.strip().split(':')
+        if len(parts) == 3:
+            h, m, s = map(int, parts)
+            return h * 3600 + m * 60 + s
+        elif len(parts) == 2:
+            m, s = map(int, parts)
+            return m * 60 + s
+        elif len(parts) == 1:
+            return int(parts[0])
+    except:
+        return None
+    return None
+
+
+def format_time(seconds):
+    """Format seconds to HH:MM:SS"""
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
+async def get_media_info(file_path):
+    """Get media file information"""
+    try:
+        from hachoir.metadata import extractMetadata
+        from hachoir.parser import createParser
         
+        parser = createParser(file_path)
+        if parser:
+            metadata = extractMetadata(parser)
+            if metadata:
+                info = {
+                    'duration': 0,
+                    'width': 0,
+                    'height': 0,
+                    'has_audio': False,
+                    'has_video': False
+                }
+                
+                if metadata.has("duration"):
+                    info['duration'] = metadata.get('duration').seconds
+                if metadata.has("width"):
+                    info['width'] = metadata.get('width')
+                if metadata.has("height"):
+                    info['height'] = metadata.get('height')
+                if metadata.has("audio_codec"):
+                    info['has_audio'] = True
+                if metadata.has("video_codec"):
+                    info['has_video'] = True
+                    
+                return info
+    except Exception as e:
+        logging.error(f"Error getting media info: {e}")
+    
+    return None
 
 
-
+def check_premium_client(app):
+    """Check if premium client is available and has premium"""
+    try:
+        if app and hasattr(app, 'me') and app.me:
+            return getattr(app.me, 'is_premium', False)
+        return False
+    except:
+        return False
