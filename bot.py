@@ -10,7 +10,7 @@ from datetime import datetime
 import asyncio
 from plugins.web_support import web_server
 import pyromod
-import aiohttp
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -19,21 +19,11 @@ logging.basicConfig(
 )
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 
-async def keep_alive_ping():
-    while True:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get("https://running-aime-file-get-81528fdc.koyeb.app/") as resp:
-                    print(f"Pinged self: {resp.status}")
-        except Exception as e:
-            print(f"Ping error: {e}")
-        await asyncio.sleep(60)
-
 
 class Bot(Client):
     def __init__(self):
         super().__init__(
-            name="AshutoshGoswami24",
+            name="pp_bots",
             api_id=Config.API_ID,
             api_hash=Config.API_HASH,
             bot_token=Config.BOT_TOKEN,
@@ -44,7 +34,6 @@ class Bot(Client):
 
     async def start(self):
         await super().start()
-        asyncio.create_task(keep_alive_ping())
         me = await self.get_me()
         self.mention = me.mention
         self.username = me.username
@@ -60,7 +49,7 @@ class Bot(Client):
         for id in Config.ADMIN:
             try:
                 await self.send_message(
-                    id, f"**__{me.first_name}  Iꜱ Sᴛᴀʀᴛᴇᴅ.....✨️__**"
+                    id, f"**__{me.first_name} Is Started.....✨️__**"
                 )
             except:
                 pass
@@ -72,20 +61,22 @@ class Bot(Client):
                 date = curr.strftime("%d %B, %Y")
                 time = curr.strftime("%I:%M:%S %p")
                 
-                session_status = "✅ Premium Session Active" if Config.STRING_SESSION else "⚠️ No Premium Session (2GB Limit)"
+                session_status = "✅ Premium Session Active (4GB)" if Config.STRING_SESSION else "⚠️ Standard Session (2GB)"
                 
                 await self.send_message(
                     Config.LOG_CHANNEL,
-                    f"**__{me.mention} Iꜱ Rᴇsᴛᴀʀᴛᴇᴅ !!**\n\n"
-                    f"📅 Dᴀᴛᴇ : `{date}`\n"
-                    f"⏰ Tɪᴍᴇ : `{time}`\n"
-                    f"🌐 Tɪᴍᴇᴢᴏɴᴇ : `Asia/Kolkata`\n"
-                    f"🤖 Vᴇʀsɪᴏɴ : `v{__version__} (Layer {layer})`\n"
-                    f"📊 Upload Status : {session_status}",
+                    f"**__{me.mention} Is Restarted !!**\n\n"
+                    f"📅 Date: `{date}`\n"
+                    f"⏰ Time: `{time}`\n"
+                    f"🌐 Timezone: `Asia/Kolkata`\n"
+                    f"🤖 Version: `v{__version__} (Layer {layer})`\n"
+                    f"📊 Upload Status: {session_status}\n"
+                    f"🎬 Features: Rename, Trim, Merge, Extract, Compress\n\n"
+                    f"@pp_bots",
                 )
             except Exception as e:
                 logging.error(f"Failed to send log channel message: {e}")
-                print("Pʟᴇᴀꜱᴇ Mᴀᴋᴇ Tʜɪꜱ Iꜱ Aᴅᴍɪɴ Iɴ Yᴏᴜʀ Lᴏɢ Cʜᴀɴɴᴇʟ")
+                print("Please Make This Bot Admin In Your Log Channel")
 
     async def stop(self, *args):
         await super().stop()
@@ -95,15 +86,19 @@ class Bot(Client):
 # Initialize premium user client if session exists
 app = None
 if Config.STRING_SESSION:
-    app = Client(
-        name="PremiumUser",
-        api_id=Config.API_ID,
-        api_hash=Config.API_HASH,
-        session_string=Config.STRING_SESSION,
-        workers=200,
-        sleep_threshold=15,
-    )
-    logging.info("Premium User Client Initialized ✅")
+    try:
+        app = Client(
+            name="PremiumUser",
+            api_id=Config.API_ID,
+            api_hash=Config.API_HASH,
+            session_string=Config.STRING_SESSION,
+            workers=200,
+            sleep_threshold=15,
+        )
+        logging.info("Premium User Client Initialized ✅")
+    except Exception as e:
+        logging.error(f"Premium client initialization error: {e}")
+        app = None
 
 bot_instance = Bot()
 
@@ -113,8 +108,8 @@ def main():
         try:
             if Config.STRING_SESSION and app:
                 await asyncio.gather(
-                    app.start(),  # Start the Premium User Client
-                    bot_instance.start(),  # Start the bot instance
+                    app.start(),
+                    bot_instance.start(),
                 )
                 logging.info("Bot and Premium User Client Started Successfully! 🚀")
             else:
