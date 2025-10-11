@@ -29,54 +29,6 @@ import shutil
 
 renaming_operations = {}
 
-# Episode patterns
-pattern1 = re.compile(r"S(\d+)(?:E|EP)(\d+)")
-pattern2 = re.compile(r"S(\d+)\s*(?:E|EP|-\s*EP)(\d+)")
-pattern3 = re.compile(r"(?:[([<{]?\s*(?:E|EP)\s*(\d+)\s*[)\]>}]?)")
-pattern3_2 = re.compile(r"(?:\s*-\s*(\d+)\s*)")
-pattern4 = re.compile(r"S(\d+)[^\d]*(\d+)", re.IGNORECASE)
-patternX = re.compile(r"(\d+)")
-
-# Quality patterns
-pattern5 = re.compile(r"\b(?:.*?(\d{3,4}[^\dp]*p).*?|.*?(\d{3,4}p))\b", re.IGNORECASE)
-pattern6 = re.compile(r"[([<{]?\s*4k\s*[)\]>}]?", re.IGNORECASE)
-pattern7 = re.compile(r"[([<{]?\s*2k\s*[)\]>}]?", re.IGNORECASE)
-pattern8 = re.compile(r"[([<{]?\s*HdRip\s*[)\]>}]?|\bHdRip\b", re.IGNORECASE)
-pattern9 = re.compile(r"[([<{]?\s*4kX264\s*[)\]>}]?", re.IGNORECASE)
-pattern10 = re.compile(r"[([<{]?\s*4kx265\s*[)\]>}]?", re.IGNORECASE)
-
-
-def extract_quality(filename):
-    """Extract video quality from filename"""
-    for pattern in [pattern5, pattern6, pattern7, pattern8, pattern9, pattern10]:
-        match = re.search(pattern, filename)
-        if match:
-            if pattern == pattern5:
-                return match.group(1) or match.group(2)
-            elif pattern == pattern6:
-                return "4k"
-            elif pattern == pattern7:
-                return "2k"
-            elif pattern == pattern8:
-                return "HdRip"
-            elif pattern == pattern9:
-                return "4kX264"
-            elif pattern == pattern10:
-                return "4kx265"
-    return "Unknown"
-
-
-def extract_episode_number(filename):
-    """Extract episode number from filename"""
-    for pattern in [pattern1, pattern2, pattern3, pattern3_2, pattern4, patternX]:
-        match = re.search(pattern, filename)
-        if match:
-            if pattern == pattern1 or pattern == pattern2 or pattern == pattern4:
-                return match.group(2)
-            else:
-                return match.group(1)
-    return None
-
 
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def handle_media_files(client, message: Message):
@@ -131,7 +83,6 @@ async def handle_media_files(client, message: Message):
         
         elif media_mode == "extract":
             print(f"[MAIN HANDLER] Routing to EXTRACT mode")
-            # Show extract/remove options
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🎵 Extract Audio", callback_data=f"extract_audio_{file.file_id}"),
@@ -161,7 +112,6 @@ async def handle_media_files(client, message: Message):
         
         elif media_mode == "autotrim":
             print(f"[MAIN HANDLER] AUTOTRIM mode (not implemented)")
-            # Future implementation
             await message.reply_text(
                 "**🤖 Auto Trim Mode**\n\n"
                 "This feature is coming soon!\n\n"
@@ -170,7 +120,6 @@ async def handle_media_files(client, message: Message):
         
         else:
             print(f"[MAIN HANDLER] Unknown mode, defaulting to RENAME")
-            # Default to rename if unknown mode
             await handle_rename_mode(client, message, file, filename, file_size, media_type)
             
     except Exception as e:
@@ -179,7 +128,6 @@ async def handle_media_files(client, message: Message):
         await message.reply_text(f"**❌ Error processing file:** `{e}`")
 
 
-# Callback to show remove streams options
 @Client.on_callback_query(filters.regex("^show_remove_options_"))
 async def show_remove_options_callback(client, query):
     """Show remove streams options"""
@@ -210,16 +158,14 @@ async def show_remove_options_callback(client, query):
 
 
 async def handle_rename_mode(client, message, file, filename, file_size, media_type):
-    """Handle file renaming with templates or word replacement"""
+    """Handle file renaming with remove/replace words or ask for new name"""
     print(f"\n{'='*60}")
     print(f"[RENAME MODE] Started")
     
     user_id = message.from_user.id
-    format_template = await pp_bots.get_format_template(user_id)
     media_preference = await pp_bots.get_media_preference(user_id)
     upload_channel = await pp_bots.get_upload_channel(user_id)
     
-    print(f"[RENAME MODE] Format template: {format_template}")
     print(f"[RENAME MODE] Media preference: {media_preference}")
     print(f"[RENAME MODE] Upload channel: {upload_channel}")
     
@@ -247,55 +193,89 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
     
     print(f"[STEP 1] Original filename: {filename}")
     
-    # Determine new filename
+    # Get file extension
     _, file_extension = os.path.splitext(filename)
     print(f"[STEP 1] File extension: {file_extension}")
     
-    if format_template:
-        # Use template
-        new_filename = format_template
-        
-        # Replace episode
-        episode = extract_episode_number(filename)
-        if episode:
-            new_filename = new_filename.replace("[episode]", f"EP{episode}", 1)
-            print(f"[STEP 2] Episode extracted: {episode}")
-        
-        # Replace quality
-        quality = extract_quality(filename)
-        new_filename = new_filename.replace("[quality]", quality)
-        print(f"[STEP 2] Quality extracted: {quality}")
-        
-        new_filename = f"{new_filename}{file_extension}"
-        print(f"[STEP 2] Template applied: {new_filename}")
-    else:
-        # Use word removal/replacement
-        remove_words = await pp_bots.get_remove_words(user_id)
-        replace_words = await pp_bots.get_replace_words(user_id)
-        
-        print(f"[STEP 2] Remove words: {remove_words}")
-        print(f"[STEP 2] Replace words: {replace_words}")
-        
-        # Check caption first, then filename
-        if message.caption:
-            print(f"[STEP 2] Caption found: {message.caption}")
-            # Check if caption has extension
-            if any(message.caption.lower().endswith(ext) for ext in ['.mp4', '.mkv', '.avi', '.mov', '.m4v', '.webm']):
-                new_filename = message.caption
-                print(f"[STEP 2] Using caption as filename")
-            else:
-                new_filename = filename
-                print(f"[STEP 2] Caption has no extension, using original filename")
+    # Get remove and replace words
+    remove_words = await pp_bots.get_remove_words(user_id)
+    replace_words = await pp_bots.get_replace_words(user_id)
+    
+    print(f"[STEP 2] Remove words: {remove_words}")
+    print(f"[STEP 2] Replace words: {replace_words}")
+    
+    # Determine new filename
+    # Priority 1: Caption (if provided and has extension)
+    if message.caption:
+        print(f"[STEP 2] Caption found: {message.caption}")
+        if any(message.caption.lower().endswith(ext) for ext in ['.mp4', '.mkv', '.avi', '.mov', '.m4v', '.webm', '.mp3', '.flac', '.wav']):
+            new_filename = message.caption
+            print(f"[STEP 2] ✅ Using caption as filename")
         else:
             new_filename = filename
-            print(f"[STEP 2] No caption, using original filename")
-        
-        # Apply removals and replacements
-        name_without_ext = os.path.splitext(new_filename)[0]
+            print(f"[STEP 2] Caption has no extension, using original filename")
+    else:
+        new_filename = filename
+        print(f"[STEP 2] No caption provided")
+    
+    # Apply word removal and replacement
+    name_without_ext = os.path.splitext(new_filename)[0]
+    original_name = name_without_ext
+    
+    if remove_words:
         name_without_ext = apply_word_removal(name_without_ext, remove_words)
+        print(f"[STEP 2] After removal: {name_without_ext}")
+    
+    if replace_words:
         name_without_ext = apply_word_replacement(name_without_ext, replace_words)
-        new_filename = f"{name_without_ext}{file_extension}"
-        print(f"[STEP 2] After word removal/replacement: {new_filename}")
+        print(f"[STEP 2] After replacement: {name_without_ext}")
+    
+    new_filename = f"{name_without_ext}{file_extension}"
+    
+    # Check if no changes were made (no caption, no remove/replace words)
+    if not message.caption and not remove_words and not replace_words:
+        print(f"[STEP 2] No caption, no remove/replace words - asking user for new name")
+        
+        # Ask user for new filename
+        ask_msg = await message.reply_text(
+            f"**📝 RENAME FILE**\n\n"
+            f"**Current Name:** `{filename}`\n"
+            f"**Size:** {humanbytes(file_size)}\n\n"
+            f"**Send new filename (with extension):**\n"
+            f"Example: `My_Video{file_extension}`\n\n"
+            f"⏱️ You have 60 seconds to reply.\n"
+            f"Send /cancel to cancel."
+        )
+        
+        try:
+            # Wait for user response
+            response = await client.listen(message.chat.id, filters=filters.text, timeout=60)
+            
+            if response.text == "/cancel":
+                await ask_msg.delete()
+                await response.delete()
+                if file_id in renaming_operations:
+                    del renaming_operations[file_id]
+                return await message.reply_text("**❌ Rename cancelled.**")
+            
+            # Use user's response as new filename
+            user_filename = response.text.strip()
+            
+            # Check if extension is included
+            if not any(user_filename.lower().endswith(ext) for ext in ['.mp4', '.mkv', '.avi', '.mov', '.m4v', '.webm', '.mp3', '.flac', '.wav']):
+                user_filename = f"{user_filename}{file_extension}"
+            
+            new_filename = user_filename
+            print(f"[STEP 2] User provided filename: {new_filename}")
+            
+            await ask_msg.delete()
+            await response.delete()
+            
+        except asyncio.TimeoutError:
+            await ask_msg.edit("**⏱️ Timeout!** Using original filename.")
+            new_filename = filename
+            print(f"[STEP 2] Timeout - using original filename")
+            await asyncio.sleep(2)
     
     # Sanitize filename
     new_filename = sanitize_filename(new_filename)
@@ -309,107 +289,79 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
     
     print(f"[STEP 4] Directories created/verified")
     
-    # Create full paths
+    # Create temporary filename for download
+    temp_filename = f"temp_{uuid.uuid4().hex[:8]}{file_extension}"
+    temp_file_path = os.path.join(downloads_dir, temp_filename)
     renamed_file_path = os.path.join(downloads_dir, new_filename)
     metadata_file_path = os.path.join(metadata_dir, new_filename)
     
-    print(f"[STEP 4] Download path: {renamed_file_path}")
+    print(f"[STEP 4] Temp path: {temp_file_path}")
+    print(f"[STEP 4] Final path: {renamed_file_path}")
     print(f"[STEP 4] Metadata path: {metadata_file_path}")
     
     # Download
     download_msg = await message.reply_text("📥 Downloading...")
     
     try:
-        upload_client = app if (app and Config.STRING_SESSION) else client
+        # Try both clients
+        download_client = client  # Start with bot client
         
         print(f"[STEP 5] Starting download...")
-        print(f"[STEP 5] Using client: {'Premium (app)' if upload_client == app else 'Normal (client)'}")
+        print(f"[STEP 5] Using client: BOT CLIENT (normal)")
         print(f"[STEP 5] File ID: {file.file_id}")
-        print(f"[STEP 5] Target path: {renamed_file_path}")
-        print(f"[STEP 5] Directory exists: {os.path.exists(downloads_dir)}")
+        print(f"[STEP 5] Temp path: {temp_file_path}")
         
-        # ✅ METHOD 1: Try downloading with simplified filename first
-        # Create a safe temporary filename
-        import uuid
-        temp_filename = f"temp_{uuid.uuid4().hex[:8]}{file_extension}"
-        temp_file_path = os.path.join(downloads_dir, temp_filename)
-        
-        print(f"[STEP 5] Trying download with temp filename: {temp_filename}")
-        
-        temp_path = await upload_client.download_media(
+        # Download with temp filename
+        temp_path = await download_client.download_media(
             message,
             file_name=temp_file_path,
             progress=progress_for_pyrogram,
             progress_args=("📥 Downloading...", download_msg, time.time())
         )
         
-        print(f"[STEP 6] Download complete!")
-        print(f"[STEP 6] Returned path: {temp_path}")
-        print(f"[STEP 6] Path type: {type(temp_path)}")
+        print(f"[STEP 6] Download result: {temp_path}")
         
-        # Check if download returned None
-        if temp_path is None:
-            print(f"[STEP 6] Download returned None, trying alternative method...")
+        # If bot client failed and premium client available, try premium
+        if temp_path is None and app and Config.STRING_SESSION:
+            print(f"[STEP 6] Bot client failed, trying premium client...")
+            download_client = app
             
-            # ✅ METHOD 2: Try with just directory
-            temp_path = await upload_client.download_media(
+            temp_path = await download_client.download_media(
                 message,
-                file_name=downloads_dir,
+                file_name=temp_file_path,
                 progress=progress_for_pyrogram,
-                progress_args=("📥 Downloading (retry)...", download_msg, time.time())
+                progress_args=("📥 Downloading (premium)...", download_msg, time.time())
             )
             
-            print(f"[STEP 6] Retry returned: {temp_path}")
-            
-            if temp_path is None:
-                # ✅ METHOD 3: Try without any file_name parameter
-                print(f"[STEP 6] Still None, trying without file_name parameter...")
-                temp_path = await upload_client.download_media(
-                    message,
-                    progress=progress_for_pyrogram,
-                    progress_args=("📥 Downloading (final retry)...", download_msg, time.time())
-                )
-                
-                print(f"[STEP 6] Final retry returned: {temp_path}")
-                
-                if temp_path is None:
-                    raise ValueError("All download methods failed - file could not be downloaded")
+            print(f"[STEP 6] Premium download result: {temp_path}")
+        
+        if temp_path is None:
+            raise ValueError("Download failed - returned None. Check file access permissions.")
         
         # Verify file exists
         if not os.path.exists(temp_path):
             raise FileNotFoundError(f"Downloaded file not found at: {temp_path}")
         
         file_stat = os.stat(temp_path)
-        print(f"[STEP 6] File verified successfully")
+        print(f"[STEP 6] ✅ File verified")
         print(f"[STEP 6] File size: {humanbytes(file_stat.st_size)}")
-        print(f"[STEP 6] Downloaded to: {temp_path}")
         
-        # Now rename/move the file to our desired name
+        # Rename to final filename
         if temp_path != renamed_file_path:
             print(f"[STEP 6] Renaming file...")
             print(f"[STEP 6] From: {temp_path}")
             print(f"[STEP 6] To: {renamed_file_path}")
             
-            # Remove target if exists
             if os.path.exists(renamed_file_path):
                 os.remove(renamed_file_path)
-                print(f"[STEP 6] Removed existing target file")
             
-            # Use shutil.move for cross-directory moves
-            import shutil
             shutil.move(temp_path, renamed_file_path)
             path = renamed_file_path
-            print(f"[STEP 6] ✅ File moved successfully")
+            print(f"[STEP 6] ✅ File renamed")
         else:
             path = temp_path
-            print(f"[STEP 6] File already has correct name")
-        
-        # Final verification
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"File missing after rename: {path}")
         
         print(f"[STEP 6] Final path: {path}")
-        print(f"[STEP 6] Final size: {humanbytes(os.path.getsize(path))}")
         
     except Exception as e:
         print(f"[ERROR STEP 5/6] Download failed: {type(e).__name__}: {e}")
@@ -429,11 +381,9 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
     if _bool_metadata:
         metadata = await pp_bots.get_metadata_code(user_id)
         if metadata:
-            print(f"[STEP 7] Metadata text: {metadata}")
+            print(f"[STEP 7] Adding metadata: {metadata}")
             
             cmd = f'ffmpeg -i "{renamed_file_path}" -map 0 -c:s copy -c:a copy -c:v copy -metadata title="{metadata}" -metadata author="{metadata}" -metadata:s:s title="{metadata}" -metadata:s:a title="{metadata}" -metadata:s:v title="{metadata}" "{metadata_file_path}"'
-            
-            print(f"[STEP 7] FFmpeg command: {cmd[:200]}...")
             
             try:
                 process = await asyncio.create_subprocess_shell(
@@ -443,31 +393,19 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
                 )
                 stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300)
                 
-                print(f"[STEP 7] FFmpeg return code: {process.returncode}")
-                
                 if process.returncode == 0 and os.path.exists(metadata_file_path):
                     metadata_added = True
                     path = metadata_file_path
-                    print(f"[STEP 7] ✅ Metadata added successfully")
-                    print(f"[STEP 7] New file size: {humanbytes(os.path.getsize(path))}")
+                    print(f"[STEP 7] ✅ Metadata added")
                 else:
                     print(f"[STEP 7] ❌ Metadata failed")
-                    if stderr:
-                        stderr_text = stderr.decode()[:500]
-                        print(f"[STEP 7] FFmpeg stderr: {stderr_text}")
-            except asyncio.TimeoutError:
-                logging.warning("Metadata addition timed out")
-                print(f"[ERROR STEP 7] Metadata timeout (>300s)")
             except Exception as e:
                 logging.error(f"Metadata error: {e}")
-                print(f"[ERROR STEP 7] Metadata exception: {type(e).__name__}: {e}")
+                print(f"[ERROR STEP 7] {e}")
     
     if not metadata_added:
         path = renamed_file_path
-        print(f"[STEP 7] Using original downloaded file (no metadata)")
-    
-    print(f"[STEP 8] Final file for upload: {path}")
-    print(f"[STEP 8] File exists: {os.path.exists(path)}")
+        print(f"[STEP 7] No metadata added")
     
     # Upload
     upload_msg = await download_msg.edit("📤 Uploading...")
@@ -475,19 +413,16 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
     try:
         # Get caption
         c_caption = await pp_bots.get_caption(user_id)
-        print(f"[STEP 9] Caption template: {c_caption}")
         
         # Get duration if video
         duration = 0
         if media_type == "video":
             try:
-                print(f"[STEP 9] Extracting video metadata...")
                 metadata = extractMetadata(createParser(path))
                 if metadata and metadata.has("duration"):
                     duration = metadata.get('duration').seconds
                 print(f"[STEP 9] Video duration: {duration}s")
-            except Exception as e:
-                print(f"[STEP 9] Could not extract duration: {e}")
+            except:
                 pass
         
         caption = c_caption.format(
@@ -496,58 +431,44 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
             duration=convert(duration)
         ) if c_caption else f"**{new_filename}**"
         
-        print(f"[STEP 10] Final caption: {caption[:100]}...")
+        print(f"[STEP 10] Caption ready")
         
         # Get thumbnail
         ph_path = None
         c_thumb = await pp_bots.get_thumbnail(user_id)
         
         if c_thumb:
-            print(f"[STEP 11] Custom thumbnail set, downloading...")
             try:
                 ph_path = await client.download_media(c_thumb)
-                print(f"[STEP 11] Custom thumbnail downloaded: {ph_path}")
-            except Exception as e:
-                print(f"[STEP 11] Custom thumbnail download failed: {e}")
+                print(f"[STEP 11] Custom thumbnail downloaded")
+            except:
+                pass
         elif media_type == "video" and message.video and message.video.thumbs:
-            print(f"[STEP 11] Using video thumbnail...")
             try:
                 ph_path = await client.download_media(message.video.thumbs[0].file_id)
-                print(f"[STEP 11] Video thumbnail downloaded: {ph_path}")
-            except Exception as e:
-                print(f"[STEP 11] Video thumbnail download failed: {e}")
-        else:
-            print(f"[STEP 11] No thumbnail available")
+                print(f"[STEP 11] Video thumbnail downloaded")
+            except:
+                pass
         
         if ph_path:
             try:
-                print(f"[STEP 11] Processing thumbnail...")
                 img = Image.open(ph_path).convert("RGB")
                 img = img.resize((320, 320))
                 img.save(ph_path, "JPEG")
-                print(f"[STEP 11] Thumbnail processed: 320x320")
-            except Exception as e:
-                logging.error(f"Thumbnail processing error: {e}")
-                print(f"[ERROR STEP 11] Thumbnail processing failed: {e}")
+                print(f"[STEP 11] Thumbnail processed")
+            except:
                 clean_file(ph_path)
                 ph_path = None
         
-        # Upload destination
+        # Upload
         upload_to = upload_channel if upload_channel else message.chat.id
         upload_client = app if (app and Config.STRING_SESSION) else client
         
-        print(f"[STEP 12] Upload destination: {upload_to}")
-        print(f"[STEP 12] Upload client: {'Premium (app)' if upload_client == app else 'Normal (client)'}")
-        
-        # Get media preference
         final_media_type = media_preference or media_type
-        print(f"[STEP 12] Upload as: {final_media_type}")
         
-        # Upload based on type
-        print(f"[STEP 13] Starting upload...")
+        print(f"[STEP 13] Uploading as {final_media_type}...")
         
         if final_media_type == "document":
-            print(f"[STEP 13] Uploading as DOCUMENT")
             sent = await upload_client.send_document(
                 upload_to,
                 document=path,
@@ -557,7 +478,6 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
                 progress_args=("📤 Uploading...", upload_msg, time.time())
             )
         elif final_media_type == "video":
-            print(f"[STEP 13] Uploading as VIDEO")
             sent = await upload_client.send_video(
                 upload_to,
                 video=path,
@@ -568,7 +488,6 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
                 progress_args=("📤 Uploading...", upload_msg, time.time())
             )
         elif final_media_type == "audio":
-            print(f"[STEP 13] Uploading as AUDIO")
             sent = await upload_client.send_audio(
                 upload_to,
                 audio=path,
@@ -580,46 +499,37 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
             )
         
         print(f"[STEP 14] ✅ Upload complete!")
-        print(f"[STEP 14] Message ID: {sent.id}")
         
         # Confirmation
         if upload_channel:
             try:
                 channel_info = await client.get_chat(upload_channel)
-                print(f"[STEP 15] Uploaded to channel: {channel_info.title}")
                 await upload_msg.edit(
                     f"**✅ Upload Complete!**\n\n"
                     f"**Uploaded to:** {channel_info.title}\n"
                     f"**File:** {new_filename}\n"
                     f"**Size:** {humanbytes(file_size)}"
                 )
-            except Exception as e:
-                print(f"[STEP 15] Could not get channel info: {e}")
+            except:
                 await upload_msg.edit("**✅ Upload Complete!**")
         else:
-            print(f"[STEP 15] Uploaded to current chat")
             await upload_msg.delete()
         
         # Cleanup thumbnail
-        if ph_path:
-            clean_file(ph_path)
-            print(f"[CLEANUP] Thumbnail deleted")
+        clean_file(ph_path)
         
     except Exception as e:
         await upload_msg.edit(f"**❌ Upload Error:** `{e}`")
         logging.error(f"Upload error: {e}", exc_info=True)
-        print(f"[ERROR STEP 12-15] Upload failed: {type(e).__name__}: {e}")
+        print(f"[ERROR STEP 12-15] {e}")
     
     finally:
-        # Cleanup files
-        print(f"[CLEANUP] Starting file cleanup...")
+        # Cleanup
+        print(f"[CLEANUP] Cleaning up...")
         clean_file(renamed_file_path)
-        print(f"[CLEANUP] Deleted: {renamed_file_path}")
         clean_file(metadata_file_path)
-        print(f"[CLEANUP] Deleted: {metadata_file_path}")
         if file_id in renaming_operations:
             del renaming_operations[file_id]
-            print(f"[CLEANUP] Removed from operations dict")
         
         print(f"[RENAME MODE] Completed")
         print(f"{'='*60}\n")
