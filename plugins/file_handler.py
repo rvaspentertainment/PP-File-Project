@@ -23,6 +23,8 @@ import time
 import re
 import asyncio
 import logging
+import uuid
+import shutil
 
 
 renaming_operations = {}
@@ -326,11 +328,17 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
         print(f"[STEP 5] Target path: {renamed_file_path}")
         print(f"[STEP 5] Directory exists: {os.path.exists(downloads_dir)}")
         
-        # ✅ FIX: Download to directory first, then rename
-        # This avoids issues with special characters in filenames
+        # ✅ METHOD 1: Try downloading with simplified filename first
+        # Create a safe temporary filename
+        import uuid
+        temp_filename = f"temp_{uuid.uuid4().hex[:8]}{file_extension}"
+        temp_file_path = os.path.join(downloads_dir, temp_filename)
+        
+        print(f"[STEP 5] Trying download with temp filename: {temp_filename}")
+        
         temp_path = await upload_client.download_media(
             message,
-            file_name=downloads_dir,  # Download to directory with original name
+            file_name=temp_file_path,
             progress=progress_for_pyrogram,
             progress_args=("📥 Downloading...", download_msg, time.time())
         )
@@ -341,7 +349,31 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
         
         # Check if download returned None
         if temp_path is None:
-            raise ValueError("Download returned None - possible network error or file access issue")
+            print(f"[STEP 6] Download returned None, trying alternative method...")
+            
+            # ✅ METHOD 2: Try with just directory
+            temp_path = await upload_client.download_media(
+                message,
+                file_name=downloads_dir,
+                progress=progress_for_pyrogram,
+                progress_args=("📥 Downloading (retry)...", download_msg, time.time())
+            )
+            
+            print(f"[STEP 6] Retry returned: {temp_path}")
+            
+            if temp_path is None:
+                # ✅ METHOD 3: Try without any file_name parameter
+                print(f"[STEP 6] Still None, trying without file_name parameter...")
+                temp_path = await upload_client.download_media(
+                    message,
+                    progress=progress_for_pyrogram,
+                    progress_args=("📥 Downloading (final retry)...", download_msg, time.time())
+                )
+                
+                print(f"[STEP 6] Final retry returned: {temp_path}")
+                
+                if temp_path is None:
+                    raise ValueError("All download methods failed - file could not be downloaded")
         
         # Verify file exists
         if not os.path.exists(temp_path):
@@ -350,8 +382,9 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
         file_stat = os.stat(temp_path)
         print(f"[STEP 6] File verified successfully")
         print(f"[STEP 6] File size: {humanbytes(file_stat.st_size)}")
+        print(f"[STEP 6] Downloaded to: {temp_path}")
         
-        # Now rename the file to our desired name
+        # Now rename/move the file to our desired name
         if temp_path != renamed_file_path:
             print(f"[STEP 6] Renaming file...")
             print(f"[STEP 6] From: {temp_path}")
@@ -362,9 +395,11 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
                 os.remove(renamed_file_path)
                 print(f"[STEP 6] Removed existing target file")
             
-            os.rename(temp_path, renamed_file_path)
+            # Use shutil.move for cross-directory moves
+            import shutil
+            shutil.move(temp_path, renamed_file_path)
             path = renamed_file_path
-            print(f"[STEP 6] ✅ File renamed successfully")
+            print(f"[STEP 6] ✅ File moved successfully")
         else:
             path = temp_path
             print(f"[STEP 6] File already has correct name")
