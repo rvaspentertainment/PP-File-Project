@@ -15,23 +15,23 @@ class Database:
         self.col = self.pp_bots.user
 
     def new_user(self, id):
-    return dict(
-        _id=int(id),
-        file_id=None,
-        caption=None,
-        metadata=True,
-        metadata_code="Telegram : @pp_bots",
-        format_template=None,
-        upload_channel=None,
-        media_mode="rename",
-        remove_words=[],
-        replace_words={},
-        prefix=None,  # NEW
-        suffix=None,  # NEW
-        merge_queue=[],
-        merge_type=None,
-        compression_qualities=[],
-        media_preference=None,
+        return dict(
+            _id=int(id),
+            file_id=None,
+            caption=None,
+            metadata=True,
+            metadata_code="Telegram : @pp_bots",
+            format_template=None,
+            upload_channel=None,
+            media_mode="rename",
+            remove_words=[],
+            replace_words={},
+            prefix=None,  # NEW
+            suffix=None,  # NEW
+            merge_queue=[],
+            merge_type=None,
+            compression_qualities=[],
+            media_preference=None,
         )
 
     async def add_user(self, b, m):
@@ -348,4 +348,5 @@ class Database:
 
 pp_bots = Database(Config.DB_URL, Config.DB_NAME)
 AshutoshGoswami24 = Database(Config.DB_URL, Config.DB_NAME)
+
 
