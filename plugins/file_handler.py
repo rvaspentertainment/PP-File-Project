@@ -237,22 +237,21 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
         print(f"[STEP 2] No caption, no remove/replace words - asking user for new name")
         
         # Ask user for new filename
-        ask_msg = await message.reply_text(
-            f"**📝 RENAME FILE**\n\n"
-            f"**Current Name:** `{filename}`\n"
-            f"**Size:** {humanbytes(file_size)}\n\n"
-            f"**Send new filename (with extension):**\n"
-            f"Example: `My_Video{file_extension}`\n\n"
-            f"⏱️ You have 60 seconds to reply.\n"
-            f"Send /cancel to cancel."
-        )
-        
         try:
-            # Wait for user response
-            response = await client.listen(message.chat.id, filters=filters.text, timeout=60)
+            response = await client.ask(
+                user_id,
+                f"**📝 RENAME FILE**\n\n"
+                f"**Current Name:** `{filename}`\n"
+                f"**Size:** {humanbytes(file_size)}\n\n"
+                f"**Send new filename (with extension):**\n"
+                f"Example: `My_Video{file_extension}`\n\n"
+                f"⏱️ You have 60 seconds to reply.\n"
+                f"Send /cancel to cancel.",
+                timeout=60
+            )
             
             if response.text == "/cancel":
-                await ask_msg.delete()
+                await response.request.delete()
                 await response.delete()
                 if file_id in renaming_operations:
                     del renaming_operations[file_id]
@@ -268,13 +267,17 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
             new_filename = user_filename
             print(f"[STEP 2] User provided filename: {new_filename}")
             
-            await ask_msg.delete()
-            await response.delete()
+            # Delete ask message and response
+            try:
+                await response.request.delete()
+                await response.delete()
+            except:
+                pass
             
         except asyncio.TimeoutError:
-            await ask_msg.edit("**⏱️ Timeout!** Using original filename.")
             new_filename = filename
             print(f"[STEP 2] Timeout - using original filename")
+            await message.reply_text("**⏱️ Timeout!** Using original filename.", quote=True)
             await asyncio.sleep(2)
     
     # Sanitize filename
