@@ -15,21 +15,23 @@ class Database:
         self.col = self.pp_bots.user
 
     def new_user(self, id):
-        return dict(
-            _id=int(id),
-            file_id=None,
-            caption=None,
-            metadata=True,
-            metadata_code="Telegram : @pp_bots",
-            format_template=None,
-            upload_channel=None,
-            media_mode="rename",  # rename, trim, extract, merge, compress, autotrim
-            remove_words=[],  # List of words to remove
-            replace_words={},  # Dict of old:new replacements
-            merge_queue=[],  # Queue for merge operations
-            merge_type=None,  # video, audio, subtitle
-            compression_qualities=[],  # List of qualities to compress
-            media_preference=None,  # document, video, audio
+    return dict(
+        _id=int(id),
+        file_id=None,
+        caption=None,
+        metadata=True,
+        metadata_code="Telegram : @pp_bots",
+        format_template=None,
+        upload_channel=None,
+        media_mode="rename",
+        remove_words=[],
+        replace_words={},
+        prefix=None,  # NEW
+        suffix=None,  # NEW
+        merge_queue=[],
+        merge_type=None,
+        compression_qualities=[],
+        media_preference=None,
         )
 
     async def add_user(self, b, m):
@@ -307,7 +309,43 @@ class Database:
         except Exception as e:
             logging.error(f"Error getting compression qualities for user {id}: {e}")
             return []
+            
+    # Prefix
+    async def set_prefix(self, id, prefix):
+        try:
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"prefix": prefix}}
+            )
+        except Exception as e:
+            logging.error(f"Error setting prefix for user {id}: {e}")
+            
+    async def get_prefix(self, id):
+        try:
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("prefix", None) if user else None
+        except Exception as e:
+            logging.error(f"Error getting prefix for user {id}: {e}")
+            return None
+            
+    # Suffix
+    async def set_suffix(self, id, suffix):
+        try:
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"suffix": suffix}}
+            )
+        except Exception as e:
+            logging.error(f"Error setting suffix for user {id}: {e}")
+            
+    async def get_suffix(self, id):
+        try:
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("suffix", None) if user else None
+        except Exception as e:
+            logging.error(f"Error getting suffix for user {id}: {e}")
+            return None
+
 
 
 pp_bots = Database(Config.DB_URL, Config.DB_NAME)
 AshutoshGoswami24 = Database(Config.DB_URL, Config.DB_NAME)
+
