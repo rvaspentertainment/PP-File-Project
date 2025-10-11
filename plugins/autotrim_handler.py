@@ -372,7 +372,7 @@ def generate_thumbnail_with_episode(base_thumb_url, episode_number, output_path)
         return False
 
 
-@Client.on_message(filters.private & filters.command("autotrim"))
+@Client.on_message(filters.private & filters.command(["autotrim"]))
 async def autotrim_command(client, message: Message):
     """Handle autotrim command"""
     user_id = message.from_user.id
@@ -575,7 +575,7 @@ async def autotrim_command(client, message: Message):
         await message.reply_text(f"❌ **Error:** `{str(e)}`")
 
 
-@Client.on_message(filters.private & filters.text & ~filters.command(["autotrim", "autotrimhelp"]))
+@Client.on_message(filters.private & filters.text & ~filters.command(["autotrim", "autotrimhelp", "autotrimstatus", "autotrimcancel", "start", "help"]))
 async def handle_filename_response(client, message: Message):
     """Handle filename response for autotrim"""
     user_id = message.from_user.id
@@ -698,7 +698,7 @@ async def handle_filename_response(client, message: Message):
         log_step("CLEANUP", f"✓ User state cleared for {user_id}")
 
 
-@Client.on_message(filters.private & filters.command("autotrimhelp"))
+@Client.on_message(filters.private & filters.command(["autotrimhelp"]))
 async def autotrim_help(client, message):
     """Show help for autotrim feature"""
     help_text = """<b>✂️ AUTO-TRIM FEATURE</b>
@@ -783,7 +783,7 @@ If you encounter issues, check the console logs for detailed error messages and 
     await message.reply_text(help_text, disable_web_page_preview=True)
 
 
-@Client.on_message(filters.private & filters.command("autotrimstatus"))
+@Client.on_message(filters.private & filters.command(["autotrimstatus"]))
 async def autotrim_status(client, message: Message):
     """Check autotrim processing status"""
     user_id = message.from_user.id
@@ -805,7 +805,7 @@ async def autotrim_status(client, message: Message):
         )
 
 
-@Client.on_message(filters.private & filters.command("autotrimcancel"))
+@Client.on_message(filters.private & filters.command(["autotrimcancel"]))
 async def autotrim_cancel(client, message: Message):
     """Cancel current autotrim session"""
     user_id = message.from_user.id
@@ -838,36 +838,26 @@ async def autotrim_cancel(client, message: Message):
         )
 
 
-# Error handler for the module
-def handle_autotrim_error(func):
-    """Decorator for error handling"""
-    async def wrapper(*args, **kwargs):
-        try:
-            return await func(*args, **kwargs)
-        except Exception as e:
-            log_step(f"ERROR_{func.__name__.upper()}", f"{e}")
-            print(traceback.format_exc())
-            # Try to notify user
-            try:
-                if len(args) > 1 and hasattr(args[1], 'reply_text'):
-                    await args[1].reply_text(
-                        f"❌ **Unexpected Error**\n\n"
-                        f"Function: `{func.__name__}`\n"
-                        f"Error: `{str(e)}`\n\n"
-                        f"Please check logs for details."
-                    )
-            except:
-                pass
-    return wrapper
-
-
-# Apply error handler to all command handlers
-autotrim_command = handle_autotrim_error(autotrim_command)
-handle_filename_response = handle_autotrim_error(handle_filename_response)
-
-
 # Startup log
 log_step("MODULE_LOADED", "Auto-Trim module initialized successfully")
 log_step("CONFIG", f"Intro template URL: {INTRO_TITLE_VIDEO_URL}")
 log_step("CONFIG", f"Target channel: {JAI_BAJARANGABALI_CHANNEL}")
 log_step("CONFIG", f"Base thumbnail: {JAI_BAJARANGABALI_THUMB_BASE}")
+
+
+# Test command to verify handlers are working
+@Client.on_message(filters.private & filters.command(["autotrimtest"]))
+async def autotrim_test(client, message: Message):
+    """Test if autotrim module is loaded and working"""
+    await message.reply_text(
+        "✅ **Auto-Trim Module Active**\n\n"
+        f"📝 Available Commands:\n"
+        f"• /autotrim - Start auto-trim\n"
+        f"• /autotrimhelp - Show help\n"
+        f"• /autotrimstatus - Check status\n"
+        f"• /autotrimcancel - Cancel session\n\n"
+        f"🔧 Configuration:\n"
+        f"• Channel: `{JAI_BAJARANGABALI_CHANNEL}`\n"
+        f"• Template: `{INTRO_TITLE_VIDEO_URL}`\n\n"
+        f"Active sessions: {len(autotrim_states)}"
+    )
