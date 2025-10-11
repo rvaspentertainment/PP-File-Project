@@ -386,7 +386,12 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
         if metadata:
             print(f"[STEP 7] Adding metadata: {metadata}")
             
-            cmd = f'ffmpeg -i "{renamed_file_path}" -map 0 -c:s copy -c:a copy -c:v copy -metadata title="{metadata}" -metadata author="{metadata}" -metadata:s:s title="{metadata}" -metadata:s:a title="{metadata}" -metadata:s:v title="{metadata}" "{metadata_file_path}"'
+            # Escape special characters in metadata for ffmpeg
+            metadata_escaped = metadata.replace('"', '\\"').replace("'", "\\'")
+            
+            cmd = f'ffmpeg -i "{renamed_file_path}" -map 0 -c:s copy -c:a copy -c:v copy -metadata title="{metadata_escaped}" -metadata author="{metadata_escaped}" -metadata:s:s title="{metadata_escaped}" -metadata:s:a title="{metadata_escaped}" -metadata:s:v title="{metadata_escaped}" "{metadata_file_path}"'
+            
+            print(f"[STEP 7] Running FFmpeg...")
             
             try:
                 process = await asyncio.create_subprocess_shell(
@@ -396,15 +401,23 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
                 )
                 stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300)
                 
+                print(f"[STEP 7] FFmpeg return code: {process.returncode}")
+                
                 if process.returncode == 0 and os.path.exists(metadata_file_path):
                     metadata_added = True
                     path = metadata_file_path
                     print(f"[STEP 7] ✅ Metadata added")
                 else:
-                    print(f"[STEP 7] ❌ Metadata failed")
+                    print(f"[STEP 7] ❌ Metadata failed - Return code: {process.returncode}")
+                    if stderr:
+                        stderr_text = stderr.decode()[:1000]
+                        print(f"[STEP 7] FFmpeg stderr: {stderr_text}")
+            except asyncio.TimeoutError:
+                logging.warning("Metadata addition timed out")
+                print(f"[ERROR STEP 7] Timeout after 300s")
             except Exception as e:
                 logging.error(f"Metadata error: {e}")
-                print(f"[ERROR STEP 7] {e}")
+                print(f"[ERROR STEP 7] Exception: {type(e).__name__}: {e}")
     
     if not metadata_added:
         path = renamed_file_path
@@ -442,30 +455,55 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
         
         if c_thumb:
             try:
+                # Refresh thumbnail by getting the message first
+                print(f"[STEP 11] Downloading custom thumbnail...")
                 ph_path = await client.download_media(c_thumb)
                 print(f"[STEP 11] Custom thumbnail downloaded")
-            except:
-                pass
+            except Exception as e:
+                print(f"[STEP 11] Custom thumbnail failed: {e}")
+                ph_path = None
         elif media_type == "video" and message.video and message.video.thumbs:
             try:
+                print(f"[STEP 11] Downloading video thumbnail...")
                 ph_path = await client.download_media(message.video.thumbs[0].file_id)
                 print(f"[STEP 11] Video thumbnail downloaded")
-            except:
-                pass
+            except Exception as e:
+                print(f"[STEP 11] Video thumbnail failed: {e}")
+                ph_path = None
         
         if ph_path:
             try:
+                print(f"[STEP 11] Processing thumbnail...")
                 img = Image.open(ph_path).convert("RGB")
                 img = img.resize((320, 320))
                 img.save(ph_path, "JPEG")
                 print(f"[STEP 11] Thumbnail processed")
-            except:
+            except Exception as e:
+                print(f"[STEP 11] Thumbnail processing failed: {e}")
                 clean_file(ph_path)
                 ph_path = None
+        else:
+            print(f"[STEP 11] No thumbnail available")
         
-        # Upload
+        # Upload destination and client selection
         upload_to = upload_channel if upload_channel else message.chat.id
-        upload_client = app if (app and Config.STRING_SESSION) else client
+        
+        # ✅ FIX: Check if premium client is properly initialized
+        if app and Config.STRING_SESSION:
+            try:
+                # Verify premium client is ready
+                if app.me is None:
+                    print(f"[STEP 12] Premium client not initialized, getting user info...")
+                    await app.get_me()
+                
+                upload_client = app
+                print(f"[STEP 12] Using PREMIUM client for upload")
+            except Exception as e:
+                print(f"[STEP 12] Premium client error: {e}, falling back to bot client")
+                upload_client = client
+        else:
+            upload_client = client
+            print(f"[STEP 12] Using BOT client for upload")
         
         final_media_type = media_preference or media_type
         
