@@ -342,6 +342,25 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
             except:
                 pass
             
+            # ✅ NEW: After user provides name, apply remove/replace
+            remove_words = await pp_bots.get_remove_words(user_id)
+            replace_words = await pp_bots.get_replace_words(user_id)
+            
+            if remove_words or replace_words:
+                print(f"[STEP 2] Applying remove/replace after user input")
+                name_without_ext = os.path.splitext(new_filename)[0]
+                
+                if remove_words:
+                    name_without_ext = apply_word_removal(name_without_ext, remove_words)
+                    print(f"[STEP 2] After removal: {name_without_ext}")
+                
+                if replace_words:
+                    name_without_ext = apply_word_replacement(name_without_ext, replace_words)
+                    print(f"[STEP 2] After replacement: {name_without_ext}")
+                
+                new_filename = f"{name_without_ext}{file_extension}"
+                print(f"[STEP 2] After remove/replace: {new_filename}")
+            
         except asyncio.TimeoutError:
             new_filename = filename
             print(f"[STEP 2] ⏱️ Timeout - using original filename")
@@ -350,7 +369,41 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
     
     # Sanitize filename
     new_filename = sanitize_filename(new_filename)
-    print(f"[STEP 3] Final sanitized filename: {new_filename}")
+    print(f"[STEP 3] Sanitized filename: {new_filename}")
+    
+    # ✅ NEW: Apply prefix, suffix, and clean underscores/dots
+    name_without_ext = os.path.splitext(new_filename)[0]
+    
+    # Get prefix and suffix
+    prefix = await pp_bots.get_prefix(user_id)
+    suffix = await pp_bots.get_suffix(user_id)
+    
+    print(f"[STEP 3] Prefix: {prefix}")
+    print(f"[STEP 3] Suffix: {suffix}")
+    
+    # Apply prefix
+    if prefix:
+        name_without_ext = f"{prefix} {name_without_ext}"
+        print(f"[STEP 3] After prefix: {name_without_ext}")
+    
+    # Clean underscores and dots to spaces
+    name_without_ext = name_without_ext.replace('_', ' ')
+    name_without_ext = name_without_ext.replace('.', ' ')
+    # Remove multiple consecutive spaces
+    import re
+    name_without_ext = re.sub(r'\s+', ' ', name_without_ext)
+    name_without_ext = name_without_ext.strip()
+    print(f"[STEP 3] After cleaning _/.: {name_without_ext}")
+    
+    # Apply suffix
+    if suffix:
+        name_without_ext = f"{name_without_ext} {suffix}"
+        print(f"[STEP 3] After suffix: {name_without_ext}")
+    
+    # Final filename
+    new_filename = f"{name_without_ext}{file_extension}"
+    new_filename = sanitize_filename(new_filename)
+    print(f"[STEP 3] Final filename: {new_filename}")
     
     # Setup paths
     downloads_dir = "downloads"
