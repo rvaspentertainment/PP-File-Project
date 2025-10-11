@@ -39,10 +39,10 @@ class Bot(Client):
         self.username = me.username
         
         # Start web server
-        app = web.AppRunner(await web_server())
-        await app.setup()
+        web_app = web.AppRunner(await web_server())
+        await web_app.setup()
         bind_address = "0.0.0.0"
-        await web.TCPSite(app, bind_address, Config.PORT).start()
+        await web.TCPSite(web_app, bind_address, Config.PORT).start()
         logging.info(f"{me.first_name} ✅✅ BOT started successfully ✅✅")
 
         # Notify admins
@@ -61,7 +61,14 @@ class Bot(Client):
                 date = curr.strftime("%d %B, %Y")
                 time = curr.strftime("%I:%M:%S %p")
                 
-                session_status = "✅ Premium Session Active (4GB)" if Config.STRING_SESSION else "⚠️ Standard Session (2GB)"
+                # ✅ Check if premium client is actually running
+                premium_status = "⚠️ Standard Session (2GB)"
+                if Config.STRING_SESSION and app:
+                    try:
+                        premium_me = await app.get_me()
+                        premium_status = f"✅ Premium Session Active (4GB) - @{premium_me.username or premium_me.first_name}"
+                    except:
+                        premium_status = "⚠️ Premium Session Failed (Using 2GB)"
                 
                 await self.send_message(
                     Config.LOG_CHANNEL,
@@ -70,7 +77,7 @@ class Bot(Client):
                     f"⏰ Time: `{time}`\n"
                     f"🌐 Timezone: `Asia/Kolkata`\n"
                     f"🤖 Version: `v{__version__} (Layer {layer})`\n"
-                    f"📊 Upload Status: {session_status}\n"
+                    f"📊 Upload Status: {premium_status}\n"
                     f"🎬 Features: Rename, Trim, Merge, Extract, Compress\n\n"
                     f"@pp_bots",
                 )
@@ -83,7 +90,7 @@ class Bot(Client):
         logging.info("Bot Stopped 🙄")
 
 
-# Initialize premium user client if session exists
+# ✅ Initialize premium user client BEFORE bot instance
 app = None
 if Config.STRING_SESSION:
     try:
@@ -107,28 +114,68 @@ def main():
     async def start_services():
         try:
             if Config.STRING_SESSION and app:
-                await asyncio.gather(
-                    app.start(),
-                    bot_instance.start(),
-                )
-                logging.info("Bot and Premium User Client Started Successfully! 🚀")
+                # ✅ Start premium client FIRST, then bot
+                logging.info("Starting Premium User Client...")
+                await app.start()
+                
+                # ✅ Verify premium client is working
+                try:
+                    premium_me = await app.get_me()
+                    logging.info(f"✅ Premium Client Connected: {premium_me.first_name} (@{premium_me.username or 'no username'})")
+                    logging.info(f"✅ Premium Client ID: {premium_me.id}")
+                    logging.info(f"✅ Premium Status: {'Premium ⭐' if premium_me.is_premium else 'Regular'}")
+                except Exception as e:
+                    logging.error(f"❌ Premium client verification failed: {e}")
+                    raise
+                
+                # Now start bot
+                logging.info("Starting Bot Client...")
+                await bot_instance.start()
+                
+                logging.info("=" * 60)
+                logging.info("🎉 Bot and Premium User Client Started Successfully! 🚀")
+                logging.info("📤 4GB Upload Support: ENABLED ✅")
+                logging.info("=" * 60)
             else:
                 await bot_instance.start()
-                logging.info("Bot Started (Without Premium Session - 2GB Upload Limit) ⚠️")
+                logging.info("=" * 60)
+                logging.info("⚠️ Bot Started (Without Premium Session - 2GB Upload Limit)")
+                logging.info("💡 Add STRING_SESSION env variable for 4GB support")
+                logging.info("=" * 60)
             
             # Keep running
             await idle()
+            
         except Exception as e:
-            logging.error(f"Error starting services: {e}")
+            logging.error(f"❌ Error starting services: {e}")
             raise
+        finally:
+            # ✅ Proper cleanup
+            try:
+                if app:
+                    await app.stop()
+                    logging.info("Premium client stopped")
+                await bot_instance.stop()
+                logging.info("Bot stopped")
+            except:
+                pass
 
     try:
-        loop = asyncio.get_event_loop()
+        # ✅ Use get_event_loop with proper error handling
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
         loop.run_until_complete(start_services())
+        
     except KeyboardInterrupt:
         logging.info("Bot stopped by user")
     except Exception as e:
         logging.error(f"Fatal error: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
