@@ -324,26 +324,57 @@ async def handle_rename_mode(client, message, file, filename, file_size, media_t
         print(f"[STEP 5] Using client: {'Premium (app)' if upload_client == app else 'Normal (client)'}")
         print(f"[STEP 5] File ID: {file.file_id}")
         print(f"[STEP 5] Target path: {renamed_file_path}")
+        print(f"[STEP 5] Directory exists: {os.path.exists(downloads_dir)}")
         
-        # Download with proper path
-        path = await upload_client.download_media(
+        # ✅ FIX: Download to directory first, then rename
+        # This avoids issues with special characters in filenames
+        temp_path = await upload_client.download_media(
             message,
-            file_name=renamed_file_path,
+            file_name=downloads_dir,  # Download to directory with original name
             progress=progress_for_pyrogram,
             progress_args=("📥 Downloading...", download_msg, time.time())
         )
         
         print(f"[STEP 6] Download complete!")
-        print(f"[STEP 6] Returned path: {path}")
+        print(f"[STEP 6] Returned path: {temp_path}")
+        print(f"[STEP 6] Path type: {type(temp_path)}")
+        
+        # Check if download returned None
+        if temp_path is None:
+            raise ValueError("Download returned None - possible network error or file access issue")
         
         # Verify file exists
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Downloaded file not found at: {path}")
+        if not os.path.exists(temp_path):
+            raise FileNotFoundError(f"Downloaded file not found at: {temp_path}")
         
-        file_stat = os.stat(path)
+        file_stat = os.stat(temp_path)
         print(f"[STEP 6] File verified successfully")
         print(f"[STEP 6] File size: {humanbytes(file_stat.st_size)}")
-        print(f"[STEP 6] File permissions: {oct(file_stat.st_mode)}")
+        
+        # Now rename the file to our desired name
+        if temp_path != renamed_file_path:
+            print(f"[STEP 6] Renaming file...")
+            print(f"[STEP 6] From: {temp_path}")
+            print(f"[STEP 6] To: {renamed_file_path}")
+            
+            # Remove target if exists
+            if os.path.exists(renamed_file_path):
+                os.remove(renamed_file_path)
+                print(f"[STEP 6] Removed existing target file")
+            
+            os.rename(temp_path, renamed_file_path)
+            path = renamed_file_path
+            print(f"[STEP 6] ✅ File renamed successfully")
+        else:
+            path = temp_path
+            print(f"[STEP 6] File already has correct name")
+        
+        # Final verification
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"File missing after rename: {path}")
+        
+        print(f"[STEP 6] Final path: {path}")
+        print(f"[STEP 6] Final size: {humanbytes(os.path.getsize(path))}")
         
     except Exception as e:
         print(f"[ERROR STEP 5/6] Download failed: {type(e).__name__}: {e}")
