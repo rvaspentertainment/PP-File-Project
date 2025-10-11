@@ -171,8 +171,8 @@ def apply_word_removal(text, remove_words):
         return text
     
     for word in remove_words:
-        # Remove word (case insensitive)
-        text = re.sub(re.escape(word), '', text, flags=re.IGNORECASE)
+        # Remove word (case sensitive to preserve intentional casing)
+        text = text.replace(word, '')
     
     # Clean up extra spaces
     text = re.sub(r'\s+', ' ', text).strip()
@@ -185,10 +185,76 @@ def apply_word_replacement(text, replace_dict):
         return text
     
     for old, new in replace_dict.items():
-        # Replace word (case insensitive)
-        text = re.sub(re.escape(old), new, text, flags=re.IGNORECASE)
+        # Replace word (case sensitive)
+        text = text.replace(old, new)
     
     return text
+
+
+def clean_underscores_dots(text):
+    """
+    Clean filename by replacing underscores and dots with spaces
+    Handles patterns like: movie.2022.360p or movie_2022_360p
+    """
+    # Replace underscores with spaces
+    text = text.replace('_', ' ')
+    
+    # Replace dots with spaces (except in numbers like 1.5, 2.0 etc)
+    text = text.replace('.', ' ')
+    
+    # Remove multiple consecutive spaces
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Strip leading/trailing spaces
+    text = text.strip()
+    
+    return text
+
+
+async def apply_all_transformations(filename, user_id, pp_bots):
+    """
+    Apply all transformations in order:
+    1. Add prefix
+    2. Remove words
+    3. Replace words
+    4. Clean underscores/dots to spaces
+    5. Add suffix
+    """
+    name, ext = os.path.splitext(filename)
+    
+    # Step 1: Get prefix
+    prefix = await pp_bots.get_prefix(user_id)
+    if prefix:
+        name = f"{prefix} {name}"
+        logging.info(f"[TRANSFORM] After prefix: {name}")
+    
+    # Step 2: Remove words
+    remove_words = await pp_bots.get_remove_words(user_id)
+    if remove_words:
+        name = apply_word_removal(name, remove_words)
+        logging.info(f"[TRANSFORM] After removal: {name}")
+    
+    # Step 3: Replace words
+    replace_words = await pp_bots.get_replace_words(user_id)
+    if replace_words:
+        name = apply_word_replacement(name, replace_words)
+        logging.info(f"[TRANSFORM] After replacement: {name}")
+    
+    # Step 4: Clean underscores and dots
+    name = clean_underscores_dots(name)
+    logging.info(f"[TRANSFORM] After cleaning: {name}")
+    
+    # Step 5: Get suffix
+    suffix = await pp_bots.get_suffix(user_id)
+    if suffix:
+        name = f"{name} {suffix}"
+        logging.info(f"[TRANSFORM] After suffix: {name}")
+    
+    # Final cleanup
+    name = re.sub(r'\s+', ' ')
+    name = name.strip()
+    
+    return f"{name}{ext}"
 
 
 def get_file_extension(filename):
