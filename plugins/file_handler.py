@@ -10,7 +10,9 @@ from config import Config
 from plugins.jai_bajarangabali import is_jai_bajarangabali_file, handle_jai_bajarangabali
 from plugins.trim import handle_trim_mode_media
 from plugins.compress import handle_compress_mode_media
-from plugins.extract_merge import handle_extract_mode_media, handle_merge_mode_media
+from plugins.extract import handle_extract_mode_media
+from plugins.merge import handle_merge_mode_media
+from plugins.remove_streams import handle_remove_streams_mode
 from PIL import Image
 from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
@@ -109,14 +111,37 @@ async def handle_media_files(client, message: Message):
     try:
         if media_mode == "rename":
             await handle_rename_mode(client, message, file, filename, file_size, media_type)
+        
         elif media_mode == "trim":
             await handle_trim_mode_media(client, message, file, filename, file_size)
+        
         elif media_mode == "extract":
-            await handle_extract_mode_media(client, message, file, filename, file_size)
+            # Show extract/remove options
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🎵 Extract Audio", callback_data=f"extract_audio_{file.file_id}"),
+                    InlineKeyboardButton("📝 Extract Subs", callback_data=f"extract_subs_{file.file_id}")
+                ],
+                [
+                    InlineKeyboardButton("🗑️ Remove Streams", callback_data=f"show_remove_options_{file.file_id}")
+                ],
+                [InlineKeyboardButton("❌ Cancel", callback_data="close")]
+            ])
+            
+            await message.reply_text(
+                f"**🎵 EXTRACT/REMOVE MODE**\n\n"
+                f"**File:** {filename}\n"
+                f"**Size:** {humanbytes(file_size)}\n\n"
+                f"**Choose action:**",
+                reply_markup=keyboard
+            )
+        
         elif media_mode == "merge":
             await handle_merge_mode_media(client, message, file, filename, file_size, media_type)
+        
         elif media_mode == "compress":
             await handle_compress_mode_media(client, message, file, filename, file_size)
+        
         elif media_mode == "autotrim":
             # Future implementation
             await message.reply_text(
@@ -124,12 +149,44 @@ async def handle_media_files(client, message: Message):
                 "This feature is coming soon!\n\n"
                 "Use `/media trim` for manual trimming."
             )
+        
         else:
             # Default to rename if unknown mode
             await handle_rename_mode(client, message, file, filename, file_size, media_type)
+            
     except Exception as e:
         logging.error(f"Error in media handler: {e}")
         await message.reply_text(f"**❌ Error processing file:** `{e}`")
+
+
+# Callback to show remove streams options
+@Client.on_callback_query(filters.regex("^show_remove_options_"))
+async def show_remove_options_callback(client, query):
+    """Show remove streams options"""
+    file_id = query.data.split("_")[-1]
+    
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔇 Remove Audio", callback_data=f"remove_all_audio_{file_id}"),
+            InlineKeyboardButton("📝 Remove Subs", callback_data=f"remove_all_subs_{file_id}")
+        ],
+        [
+            InlineKeyboardButton("🔇📝 Remove Both", callback_data=f"remove_both_{file_id}")
+        ],
+        [
+            InlineKeyboardButton("🔙 Back", callback_data=f"extract_audio_{file_id}"),
+            InlineKeyboardButton("❌ Cancel", callback_data="close")
+        ]
+    ])
+    
+    await query.message.edit_text(
+        "**🗑️ REMOVE STREAMS**\n\n"
+        "**Choose what to remove:**\n\n"
+        "• Remove Audio - Keep only video\n"
+        "• Remove Subs - Keep video + audio\n"
+        "• Remove Both - Video only",
+        reply_markup=keyboard
+    )
 
 
 async def handle_rename_mode(client, message, file, filename, file_size, media_type):
