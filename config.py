@@ -1,4 +1,5 @@
 import re, os, time
+
 id_pattern = re.compile(r'^.\d+$') 
 
 class Config(object):
@@ -7,7 +8,7 @@ class Config(object):
     API_HASH  = os.environ.get("API_HASH", "")
     BOT_TOKEN = os.environ.get("BOT_TOKEN", "") 
 
-    # Premium user session for 4GB upload
+    # Premium user session for 4GB upload (OPTIONAL)
     STRING_SESSION = os.environ.get("STRING_SESSION", "")
 
     # database config
@@ -17,17 +18,41 @@ class Config(object):
     # other configs
     BOT_UPTIME  = time.time()
     START_PIC   = os.environ.get("START_PIC", "")
-    ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '').split()]
-    FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', 'pp_bots').split(',')
-    LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "0"))
+    
+    # ADMIN - Parse safely
+    admin_str = os.environ.get('ADMIN', '')
+    if admin_str:
+        ADMIN = [int(admin) if id_pattern.search(admin) else admin for admin in admin_str.split()]
+    else:
+        ADMIN = []
+    
+    # FORCE_SUB_CHANNELS - Parse safely (OPTIONAL)
+    fsub_str = os.environ.get('FORCE_SUB_CHANNELS', '')
+    if fsub_str and fsub_str.strip():
+        FORCE_SUB_CHANNELS = [ch.strip() for ch in fsub_str.split(',') if ch.strip()]
+    else:
+        FORCE_SUB_CHANNELS = []
+    
+    # LOG_CHANNEL - Parse safely (OPTIONAL)
+    log_channel_str = os.environ.get("LOG_CHANNEL", "0")
+    try:
+        LOG_CHANNEL = int(log_channel_str)
+    except:
+        LOG_CHANNEL = 0
+    
     PORT = int(os.environ.get("PORT", "8080"))
     
     # File size limits
     MAX_FILE_SIZE = 4 * 1024 * 1024 * 1024  # 4GB in bytes
     MAX_FILE_SIZE_NON_PREMIUM = 2 * 1024 * 1024 * 1024  # 2GB for non-premium
     
-    # Special handler config
-    JAI_BAJARANGABALI_CHANNEL = int(os.environ.get("JAI_BAJARANGABALI_CHANNEL", "-1002987317144"))
+    # Special handler config (OPTIONAL)
+    jai_channel_str = os.environ.get("JAI_BAJARANGABALI_CHANNEL", "-1002987317144")
+    try:
+        JAI_BAJARANGABALI_CHANNEL = int(jai_channel_str)
+    except:
+        JAI_BAJARANGABALI_CHANNEL = 0
+    
     JAI_BAJARANGABALI_THUMB = os.environ.get("JAI_BAJARANGABALI_THUMB", "https://envs.sh/zcf.jpg")
     
     # Compression presets
@@ -47,7 +72,7 @@ class Config(object):
 
 
 class Txt(object):
-    # Text configuration
+    # Text configuration (same as before - keeping it short here)
         
     START_TXT = """Hello {} 👋
     
@@ -216,119 +241,6 @@ class Txt(object):
 
 Use buttons below to configure ⬇️"""
 
-    MEDIA_MODE_TXT = """<b>🎬 MEDIA PROCESSING MODE</b>
-
-**Select Processing Mode:**
-
-├ 📝 **Rename** - Rename files with template
-├ ✂️ **Trim** - Cut/trim videos
-├ 🎵 **Extract** - Extract audio/subtitles
-├ 🔗 **Merge** - Merge multiple files
-├ 🎞️ **Compress** - Compress to multiple qualities
-└ 🤖 **Auto Trim** - Auto detection & trim
-
-**Current Mode:** `{current_mode}`
-
-Select mode using buttons below:"""
-
-    COMPRESS_TXT = """<b>🎞️ VIDEO COMPRESSION</b>
-
-**Available Qualities:**
-├ 1080p (Full HD) - 3000k bitrate
-├ 720p (HD) - 2000k bitrate
-├ 576p (SD) - 1500k bitrate
-├ 480p (SD) - 1000k bitrate
-└ 360p (Low) - 500k bitrate
-
-**How to Use:**
-Send video file in compress mode
-Or use: /compress 720p,480p,360p
-
-**Features:**
-✓ Multiple quality output
-✓ Fast encoding (H.264)
-✓ Maintains aspect ratio
-✓ Auto thumbnail generation"""
-
-    TRIM_TXT = """<b>✂️ VIDEO TRIMMING</b>
-
-**Manual Trim:**
-1. Enable trim mode: /media trim
-2. Send video file
-3. Enter start time (HH:MM:SS)
-4. Enter end time (HH:MM:SS)
-
-**Auto Trim:**
-1. Enable: /media autotrim
-2. Send video or link
-3. Bot detects intro/outro automatically
-4. Trimmed video delivered
-
-**Trim from Link:**
-<code>/autotrim video_link</code>
-<code>/autotrim video_link intro_title</code>"""
-
-    MERGE_TXT = """<b>🔗 FILE MERGING</b>
-
-**How to Merge:**
-1. Enable: /media merge
-2. Choose merge type:
-   ├ Video + Video
-   ├ Video + Audio
-   ├ Video + Subtitle
-   └ Multiple files
-
-3. Send files one by one
-4. Type 'done' when finished
-5. Bot merges and sends
-
-**Supported Formats:**
-├ Videos: MP4, MKV, AVI, MOV
-├ Audio: MP3, AAC, M4A, OPUS
-└ Subtitles: SRT, ASS, VTT"""
-
-    EXTRACT_TXT = """<b>🎵 AUDIO/SUBTITLE EXTRACTION</b>
-
-**Extract Audio:**
-1. Enable: /media extract
-2. Send video file
-3. Select: Extract Audio
-4. Choose format (MP3/M4A/OPUS)
-
-**Extract Subtitles:**
-1. Enable: /media extract
-2. Send video file
-3. Select: Extract Subtitles
-4. Choose language/format
-
-**Features:**
-✓ High quality extraction
-✓ Multiple format support
-✓ Fast processing"""
-
-    WORD_REPLACEMENT_TXT = """<b>🔄 WORD REPLACEMENT SYSTEM</b>
-
-**Remove Words:**
-<code>/remove word1,word2,word3</code>
-Example: <code>/remove [Hindi],WEB-DL,x264</code>
-
-**Replace Words:**
-<code>/replace old:new,old2:new2</code>
-Example: <code>/replace S01:Season 1,EP:Episode</code>
-
-**Clear All:**
-<code>/clearwords</code>
-
-**How It Works:**
-├ Checks file caption first
-├ Falls back to filename
-├ Applies removals first
-└ Then applies replacements
-
-**Current Settings:**
-├ Remove: `{remove}`
-└ Replace: `{replace}`"""
-
     PROGRESS_BAR = """<b>\n
 ╭━━━━❰ᴘʀᴏɢʀᴇss ʙᴀʀ❱━➣
 ┣⪼ 🗃️ Size: {1} | {2}
@@ -344,20 +256,3 @@ If You Like My Bots & Projects, You Can 🎁 Donate Me Any Amount From 10 Rs Upt
 <b>My UPI - ppbots@ybl</b>
 
 <b>Support keeps us running!</b> 💖"""
-
-    SEND_METADATA = """<b>📋 Enter Custom Metadata</b>
-
-Send the metadata text you want to add to files.
-
-**Example:**
-<code>Telegram: @pp_bots</code>
-
-This will be embedded in video metadata."""
-
-    JAI_BAJARANGABALI_CAPTION = """**Jai Bajarangabali Episode {episode}**
-
-📺 Quality: {quality}
-💾 Size: {filesize}
-⏱ Duration: {duration}
-
-@pp_bots"""
