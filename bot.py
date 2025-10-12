@@ -70,9 +70,9 @@ class Bot(Client):
                 
                 # Check if premium client is running
                 premium_status = "⚠️ Standard Session (2GB)"
-                if Config.STRING_SESSION and app:
+                if Config.STRING_SESSION and premium_client:
                     try:
-                        premium_me = await app.get_me()
+                        premium_me = await premium_client.get_me()
                         if premium_me.is_premium:
                             premium_status = f"✅ Premium Session Active (4GB) - @{premium_me.username or premium_me.first_name}"
                         else:
@@ -101,11 +101,11 @@ class Bot(Client):
         logging.info("Bot Stopped 🙄")
 
 
-# Initialize premium user client
-app = None
+# Initialize premium user client (global variable)
+premium_client = None
 if Config.STRING_SESSION:
     try:
-        app = Client(
+        premium_client = Client(
             name="PremiumUser",
             api_id=Config.API_ID,
             api_hash=Config.API_HASH,
@@ -116,7 +116,10 @@ if Config.STRING_SESSION:
         logging.info("Premium User Client Initialized ✅")
     except Exception as e:
         logging.error(f"Premium client initialization error: {e}")
-        app = None
+        premium_client = None
+
+# Export for use in other files
+app = premium_client
 
 bot_instance = Bot()
 
@@ -125,17 +128,16 @@ def main():
     async def start_services():
         try:
             # Start premium client if available
-            if Config.STRING_SESSION and app:
+            if Config.STRING_SESSION and premium_client:
                 logging.info("Starting Premium User Client...")
                 try:
-                    await app.start()
-                    premium_me = await app.get_me()
+                    await premium_client.start()
+                    premium_me = await premium_client.get_me()
                     logging.info(f"✅ Premium Client Connected: {premium_me.first_name} (@{premium_me.username or 'no username'})")
                     logging.info(f"✅ Premium Client ID: {premium_me.id}")
                     logging.info(f"✅ Premium Status: {'Premium ⭐' if premium_me.is_premium else 'Regular'}")
                 except Exception as e:
                     logging.error(f"❌ Premium client start failed: {e}")
-                    app = None
             
             # Start bot
             logging.info("Starting Bot Client...")
@@ -143,7 +145,7 @@ def main():
             
             # Success message
             logging.info("=" * 60)
-            if Config.STRING_SESSION and app:
+            if Config.STRING_SESSION and premium_client:
                 logging.info("🎉 Bot and Premium User Client Started Successfully! 🚀")
                 logging.info("📤 4GB Upload Support: ENABLED ✅")
             else:
@@ -162,8 +164,8 @@ def main():
         finally:
             # Cleanup
             try:
-                if app and hasattr(app, 'is_connected') and app.is_connected:
-                    await app.stop()
+                if premium_client and hasattr(premium_client, 'is_connected') and premium_client.is_connected:
+                    await premium_client.stop()
                     logging.info("Premium client stopped")
             except Exception as e:
                 logging.error(f"Error stopping premium client: {e}")
