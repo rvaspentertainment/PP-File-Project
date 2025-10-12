@@ -1,7 +1,7 @@
 import logging
 import warnings
 from pyrogram import Client, idle
-from pyrogram import Client, __version__
+from pyrogram import __version__
 from pyrogram.raw.all import layer
 from config import Config
 from aiohttp import web
@@ -17,8 +17,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
-logging.getLogger("pyrogram").setLevel(logging.ERROR)
-
+logging.getLogger("pyrogram").setLevel(logging.WARNING)
+logging.getLogger("pyrogram.session.session").setLevel(logging.ERROR)
+logging.getLogger("pyrogram.connection.connection").setLevel(logging.ERROR)
 
 class Bot(Client):
     def __init__(self):
@@ -39,20 +40,26 @@ class Bot(Client):
         self.username = me.username
         
         # Start web server
-        web_app = web.AppRunner(await web_server())
-        await web_app.setup()
-        bind_address = "0.0.0.0"
-        await web.TCPSite(web_app, bind_address, Config.PORT).start()
+        try:
+            web_app = web.AppRunner(await web_server())
+            await web_app.setup()
+            bind_address = "0.0.0.0"
+            await web.TCPSite(web_app, bind_address, Config.PORT).start()
+            logging.info(f"✅ Web server started on port {Config.PORT}")
+        except Exception as e:
+            logging.error(f"Failed to start web server: {e}")
+        
         logging.info(f"{me.first_name} ✅✅ BOT started successfully ✅✅")
 
         # Notify admins
-        for id in Config.ADMIN:
+        for admin_id in Config.ADMIN:
             try:
                 await self.send_message(
-                    id, f"**__{me.first_name} Is Started.....✨️__**"
+                    admin_id, 
+                    f"**__{me.first_name} Is Started.....✨️__**"
                 )
-            except:
-                pass
+            except Exception as e:
+                logging.error(f"Failed to notify admin {admin_id}: {e}")
 
         # Log to channel
         if Config.LOG_CHANNEL:
@@ -61,14 +68,18 @@ class Bot(Client):
                 date = curr.strftime("%d %B, %Y")
                 time = curr.strftime("%I:%M:%S %p")
                 
-                # ✅ Check if premium client is actually running
+                # Check if premium client is running
                 premium_status = "⚠️ Standard Session (2GB)"
                 if Config.STRING_SESSION and app:
                     try:
                         premium_me = await app.get_me()
-                        premium_status = f"✅ Premium Session Active (4GB) - @{premium_me.username or premium_me.first_name}"
-                    except:
-                        premium_status = "⚠️ Premium Session Failed (Using 2GB)"
+                        if premium_me.is_premium:
+                            premium_status = f"✅ Premium Session Active (4GB) - @{premium_me.username or premium_me.first_name}"
+                        else:
+                            premium_status = f"⚠️ Non-Premium Session (2GB) - @{premium_me.username or premium_me.first_name}"
+                    except Exception as e:
+                        premium_status = f"⚠️ Premium Session Failed: {e}"
+                        logging.error(f"Premium client check failed: {e}")
                 
                 await self.send_message(
                     Config.LOG_CHANNEL,
@@ -81,16 +92,16 @@ class Bot(Client):
                     f"🎬 Features: Rename, Trim, Merge, Extract, Compress\n\n"
                     f"@pp_bots",
                 )
+                logging.info("✅ Log channel message sent")
             except Exception as e:
                 logging.error(f"Failed to send log channel message: {e}")
-                print("Please Make This Bot Admin In Your Log Channel")
 
     async def stop(self, *args):
         await super().stop()
         logging.info("Bot Stopped 🙄")
 
 
-# ✅ Initialize premium user client BEFORE bot instance
+# Initialize premium user client
 app = None
 if Config.STRING_SESSION:
     try:
@@ -113,31 +124,32 @@ bot_instance = Bot()
 def main():
     async def start_services():
         try:
+            # Start premium client if available
             if Config.STRING_SESSION and app:
                 logging.info("Starting Premium User Client...")
-                await app.start()
-                
                 try:
+                    await app.start()
                     premium_me = await app.get_me()
                     logging.info(f"✅ Premium Client Connected: {premium_me.first_name} (@{premium_me.username or 'no username'})")
                     logging.info(f"✅ Premium Client ID: {premium_me.id}")
                     logging.info(f"✅ Premium Status: {'Premium ⭐' if premium_me.is_premium else 'Regular'}")
                 except Exception as e:
-                    logging.error(f"❌ Premium client verification failed: {e}")
-                
-                logging.info("Starting Bot Client...")
-                await bot_instance.start()
-                
-                logging.info("=" * 60)
+                    logging.error(f"❌ Premium client start failed: {e}")
+                    app = None
+            
+            # Start bot
+            logging.info("Starting Bot Client...")
+            await bot_instance.start()
+            
+            # Success message
+            logging.info("=" * 60)
+            if Config.STRING_SESSION and app:
                 logging.info("🎉 Bot and Premium User Client Started Successfully! 🚀")
                 logging.info("📤 4GB Upload Support: ENABLED ✅")
-                logging.info("=" * 60)
             else:
-                await bot_instance.start()
-                logging.info("=" * 60)
-                logging.info("⚠️ Bot Started (Without Premium Session - 2GB Upload Limit)")
-                logging.info("💡 Add STRING_SESSION env variable for 4GB support")
-                logging.info("=" * 60)
+                logging.info("🎉 Bot Started Successfully! 🚀")
+                logging.info("⚠️ 2GB Upload Limit (Add STRING_SESSION for 4GB)")
+            logging.info("=" * 60)
             
             # Keep running
             await idle()
@@ -148,7 +160,7 @@ def main():
             traceback.print_exc()
             raise
         finally:
-            # ✅ Proper cleanup
+            # Cleanup
             try:
                 if app and hasattr(app, 'is_connected') and app.is_connected:
                     await app.stop()
