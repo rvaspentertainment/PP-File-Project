@@ -114,11 +114,9 @@ def main():
     async def start_services():
         try:
             if Config.STRING_SESSION and app:
-                # ✅ Start premium client FIRST, then bot
                 logging.info("Starting Premium User Client...")
                 await app.start()
                 
-                # ✅ Verify premium client is working
                 try:
                     premium_me = await app.get_me()
                     logging.info(f"✅ Premium Client Connected: {premium_me.first_name} (@{premium_me.username or 'no username'})")
@@ -126,9 +124,7 @@ def main():
                     logging.info(f"✅ Premium Status: {'Premium ⭐' if premium_me.is_premium else 'Regular'}")
                 except Exception as e:
                     logging.error(f"❌ Premium client verification failed: {e}")
-                    raise
                 
-                # Now start bot
                 logging.info("Starting Bot Client...")
                 await bot_instance.start()
                 
@@ -148,28 +144,27 @@ def main():
             
         except Exception as e:
             logging.error(f"❌ Error starting services: {e}")
+            import traceback
+            traceback.print_exc()
             raise
         finally:
             # ✅ Proper cleanup
             try:
-                if app:
+                if app and hasattr(app, 'is_connected') and app.is_connected:
                     await app.stop()
                     logging.info("Premium client stopped")
-                await bot_instance.stop()
-                logging.info("Bot stopped")
-            except:
-                pass
+            except Exception as e:
+                logging.error(f"Error stopping premium client: {e}")
+            
+            try:
+                if bot_instance and hasattr(bot_instance, 'is_connected') and bot_instance.is_connected:
+                    await bot_instance.stop()
+                    logging.info("Bot stopped")
+            except Exception as e:
+                logging.error(f"Error stopping bot: {e}")
 
     try:
-        # ✅ Use get_event_loop with proper error handling
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        loop.run_until_complete(start_services())
-        
+        asyncio.run(start_services())
     except KeyboardInterrupt:
         logging.info("Bot stopped by user")
     except Exception as e:
